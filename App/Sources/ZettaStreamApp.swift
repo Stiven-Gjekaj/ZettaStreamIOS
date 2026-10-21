@@ -3,12 +3,22 @@ import ZettaCore
 
 @main
 struct ZettaStreamApp: App {
+    @StateObject private var app = AppModel()
+
+    init() {
+        // AsyncImage reads the shared cache, so posters do not download again.
+        URLCache.shared = URLCache(memoryCapacity: 64 << 20, diskCapacity: 512 << 20)
+        let tabBar = UITabBarAppearance()
+        tabBar.configureWithOpaqueBackground()
+        tabBar.backgroundColor = .black
+        UITabBar.appearance().standardAppearance = tabBar
+        UITabBar.appearance().scrollEdgeAppearance = tabBar
+    }
+
     var body: some Scene {
         WindowGroup {
-            Text("ZettaStream")
-                .font(Karla.font(34, .bold, relativeTo: .largeTitle))
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .zettaScreen()
+            RootView()
+                .environmentObject(app)
         }
     }
 }
