@@ -68,9 +68,8 @@ final class PlayerErrorLog: NSObject, VLCLogging, @unchecked Sendable {
 
     func handleMessage(_ message: String, logLevel: VLCLogLevel, context: VLCLogContext?) {
         guard logLevel == .error else { return }
-        let line = context.map { "\($0.module): \(message)" } ?? message
         lock.withLock {
-            kept.append(line)
+            kept.append(message)
             if kept.count > FaultLog.keptLines { kept.removeFirst(kept.count - FaultLog.keptLines) }
         }
     }
