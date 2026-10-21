@@ -12,6 +12,14 @@ major number. See "Version numbers" in the decisions.
 A tag such as `v0.1.0` builds the unsigned IPA and attaches it to a release on
 GitHub as `ZettaStream.ipa`.
 
+## 0.1.1 (2026-10-21)
+
+- Fixes the install of a long source list. Only one addon worked, and the
+  other addons seemed to hang. A fault of the optimizer put the answer of
+  each addon in the same place. The search, the subtitles, and the live TV
+  playlists had the same fault.
+- Save and Paste stay near the editor of a long source list.
+
 ## 0.1.0 (2026-10-21)
 
 - The first version of ZettaStream for iPhone and iPad, with the functions of
