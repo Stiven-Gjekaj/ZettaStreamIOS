@@ -69,6 +69,9 @@ final class PlayerErrorLog: NSObject, VLCLogging, @unchecked Sendable {
 
     func handleMessage(_ message: String, logLevel: VLCLogLevel, context: VLCLogContext?) {
         guard logLevel == .error, !FaultLog.isNoise(message) else { return }
+        #if DEBUG
+        NSLog("VLC: %@", message)
+        #endif
         lock.withLock {
             kept.append(message)
             if kept.count > FaultLog.keptLines { kept.removeFirst(kept.count - FaultLog.keptLines) }

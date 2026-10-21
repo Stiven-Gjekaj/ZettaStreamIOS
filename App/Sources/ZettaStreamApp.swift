@@ -7,6 +7,9 @@ struct ZettaStreamApp: App {
     @StateObject private var app = AppModel()
 
     init() {
+        #if DEBUG
+        Diagnostics.shared.toConsole = true
+        #endif
         // AsyncImage reads the shared cache, so posters do not download again.
         URLCache.shared = URLCache(memoryCapacity: 64 << 20, diskCapacity: 512 << 20)
         let tabBar = UITabBarAppearance()
