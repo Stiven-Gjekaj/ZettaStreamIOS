@@ -207,4 +207,105 @@ struct BackupTests {
         #expect(settings["subtitleSize"] == .string("Normal"))
         #expect(settings["hiddenRows"] == .array([.string("live")]))
     }
+
+    /// The Backup code of the Android app 1.5.1 wrote this file. It is not a hand-written copy
+    /// of the form, so a change of the Android form shows here.
+    private let writtenByAndroid = """
+        {
+            "app": "ZettaStream",
+            "version": 1,
+            "library": {
+                "watchlist": [
+                    {
+                        "id": "tt0903747",
+                        "type": "series",
+                        "name": "Breaking Bad",
+                        "poster": null,
+                        "posterShape": null,
+                        "background": null,
+                        "logo": null,
+                        "description": null,
+                        "releaseInfo": null,
+                        "imdbRating": null,
+                        "genres": [],
+                        "aliases": [],
+                        "imdb_id": null
+                    }
+                ],
+                "progress": {
+                    "tt0903747:1:3": {
+                        "videoId": "tt0903747:1:3",
+                        "meta": {
+                            "id": "tt0903747",
+                            "type": "series",
+                            "name": "Breaking Bad",
+                            "poster": null,
+                            "posterShape": null,
+                            "background": null,
+                            "logo": null,
+                            "description": null,
+                            "releaseInfo": null,
+                            "imdbRating": null,
+                            "genres": [],
+                            "aliases": [],
+                            "imdb_id": null
+                        },
+                        "label": "S1 E3",
+                        "position": 600000,
+                        "duration": 2800000,
+                        "updated": 1792615467805
+                    }
+                },
+                "watched": [
+                    "tt0903747:1:1"
+                ],
+                "favoriteChannels": [
+                    "cnnus"
+                ]
+            },
+            "settings": {
+                "subtitlesOn": false,
+                "subtitleLanguage": "en",
+                "audioLanguage": "",
+                "subtitleSize": "Normal",
+                "subtitleColor": "White",
+                "subtitleBackground": "None",
+                "subtitleFont": "Default",
+                "subtitleEdge": "Outline",
+                "sideBars": "Ambient",
+                "videoFilter": "None",
+                "autoplayNext": true,
+                "autoSkipIntro": false,
+                "matchFrameRate": true,
+                "confirmChannel": true,
+                "showTorrents": false,
+                "directFirst": false,
+                "torrentUpload": false,
+                "vpnNotice": true,
+                "audioDelayMs": 120,
+                "searchHistory": [],
+                "rowOrder": [
+                    "continue"
+                ],
+                "hiddenRows": []
+            },
+            "sources": "https://c.test/manifest.json"
+        }
+        """
+
+    @Test func aFileThatTheAndroidCodeWroteRestores() throws {
+        let device = try Device()
+        let report = try device.backup.restore(writtenByAndroid)
+        #expect(report == "Restored 1 title in the watchlist, 1 video in the history, and 1 source.")
+        let library = device.library.data
+        #expect(library.watchlist.map(\.id) == ["tt0903747"])
+        #expect(library.progress["tt0903747:1:3"]?.position == 600_000)
+        #expect(library.progress["tt0903747:1:3"]?.duration == 2_800_000)
+        #expect(library.watched == ["tt0903747:1:1"])
+        #expect(library.favoriteChannels == ["cnnus"])
+        #expect(device.settings.settings.audioDelayMs == 120)
+        #expect(!device.settings.settings.showTorrents)
+        #expect(device.settings.settings.rowOrder == ["continue"])
+        #expect(device.sources.sources.map(\.url) == ["https://c.test/manifest.json"])
+    }
 }
