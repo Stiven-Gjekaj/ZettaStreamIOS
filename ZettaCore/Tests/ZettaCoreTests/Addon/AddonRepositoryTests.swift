@@ -185,6 +185,50 @@ struct AddonRepositoryTests {
         #expect(await repository.subtitles(type: "movie", videoId: "tt1").map(\.url) == ["https://s.test/1.srt", "https://s.test/2.srt"])
     }
 
+    @Test func aCatalogKeepsItsLastAnswer() async throws {
+        good.reply(goodManifest)
+        let repository = repository()
+        await repository.install(sources(good))
+        let row = try #require(await repository.homeRows().first)
+        #expect(await repository.cachedCatalog(row) == nil)
+        good.reply(#"{"metas":[{"id":"tt1","type":"movie","name":"One"}]}"#)
+        let metas = try await repository.catalog(row)
+        #expect(metas.map(\.id) == ["tt1"])
+        #expect(await repository.cachedCatalog(row) == metas)
+    }
+
+    private let metaManifest = #"{"id":"m","name":"Meta","types":["series"],"resources":["meta"],"catalogs":[]}"#
+
+    @Test func aPlaceholderEpisodeListAsksTheNextAddon() async throws {
+        let first = StubServer()
+        let second = StubServer()
+        first.reply(metaManifest)
+        second.reply(metaManifest)
+        let repository = repository()
+        await repository.install(sources(first, second))
+        first.reply(#"{"meta":{"id":"kitsu:1","type":"series","name":"One","videos":[{"id":"kitsu:1:1:1"}]}}"#)
+        second.reply(#"{"meta":{"id":"kitsu:1","type":"series","name":"One","videos":[{"id":"kitsu:1:1"},{"id":"kitsu:1:2"}]}}"#)
+        let meta = await repository.meta(MetaPreview(id: "kitsu:1", type: "series", name: "One"))
+        #expect(meta.videos.map(\.id) == ["kitsu:1:1", "kitsu:1:2"])
+    }
+
+    @Test func withNoAnswerTheDetailsAreTheFactsOfTheCard() async {
+        good.reply(metaManifest)
+        let repository = repository()
+        await repository.install(sources(good))
+        good.reply("{}", status: 500)
+        var card = MetaPreview(id: "tt1", type: "series", name: "One")
+        card.poster = "https://p.test/1.jpg"
+        card.genres = ["Drama"]
+        card.aliases = ["Uno"]
+        let meta = await repository.meta(card)
+        #expect(meta.name == "One")
+        #expect(meta.preview.poster == "https://p.test/1.jpg")
+        #expect(meta.preview.genres == ["Drama"])
+        #expect(meta.preview.aliases.isEmpty)
+        #expect(meta.videos.isEmpty)
+    }
+
     @Test func onlyTheAddonsOfTheListAreInstalled() async {
         good.reply(goodManifest)
         let repository = repository()

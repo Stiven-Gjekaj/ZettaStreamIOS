@@ -50,6 +50,7 @@ public actor AddonRepository {
     /// Goes up with each install. An install that a newer one replaced does not set the state.
     private var generation = 0
     private var streamCache: [String: (Date, [StreamGroup])] = [:]
+    private var catalogCache: [String: [MetaPreview]] = [:]
 
     /// How long a list of streams stays in memory: 15 minutes.
     public static let streamKeep: TimeInterval = 15 * 60
@@ -148,6 +149,36 @@ public actor AddonRepository {
         return keys.enumerated()
             .sorted { (order.firstIndex(of: $0.element) ?? 99, $0.offset) < (order.firstIndex(of: $1.element) ?? 99, $1.offset) }
             .map(\.element)
+    }
+
+    /// The last answer of a catalog, so that a screen comes back at once after Back.
+    public func cachedCatalog(_ row: CatalogRow) -> [MetaPreview]? {
+        catalogCache[row.key]
+    }
+
+    public func catalog(_ row: CatalogRow) async throws -> [MetaPreview] {
+        let metas = try await client.catalog(row.addon, row.catalog, extras: row.extras)
+        catalogCache[row.key] = metas
+        return metas
+    }
+
+    /// Gets the full details from the first addon that has them.
+    /// With no answer, the details are the facts of the card.
+    public func meta(_ preview: MetaPreview) async -> Meta {
+        for addon in state.addons where addon.supports("meta", type: preview.type, id: preview.id) {
+            let meta = try? await client.meta(addon, type: preview.type, id: preview.id)
+            // A series with only a placeholder episode tells nothing. The next addon can have the real list.
+            if let meta, !Display.isPlaceholder(meta) { return meta }
+        }
+        var card = MetaPreview(id: preview.id, type: preview.type, name: preview.name)
+        card.poster = preview.poster
+        card.background = preview.background
+        card.logo = preview.logo
+        card.description = preview.description
+        card.releaseInfo = preview.releaseInfo
+        card.imdbRating = preview.imdbRating
+        card.genres = preview.genres
+        return Meta(preview: card)
     }
 
     /// The last full list of streams for a video, so that Back from the player shows
