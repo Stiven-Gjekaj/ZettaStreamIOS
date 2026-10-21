@@ -6,6 +6,8 @@ final class StubServer: Sendable {
     struct Reply {
         var status = 200
         var body: String
+        /// The seconds before the answer comes. A test of a time limit uses it.
+        var delay: TimeInterval = 0
     }
 
     fileprivate static let lock = NSLock()
@@ -22,8 +24,8 @@ final class StubServer: Sendable {
 
     func url(_ path: String) -> String { "https://\(host)\(path)" }
 
-    func reply(_ body: String, status: Int = 200) {
-        Self.lock.withLock { Self.replies[host, default: []].append(Reply(status: status, body: body)) }
+    func reply(_ body: String, status: Int = 200, delay: TimeInterval = 0) {
+        Self.lock.withLock { Self.replies[host, default: []].append(Reply(status: status, body: body, delay: delay)) }
     }
 
     /// The paths that the code asked for, in order.
@@ -37,6 +39,9 @@ final class StubServer: Sendable {
 
     /// The part that URLSession calls. It gives the next answer of the host.
     final class Loader: URLProtocol, @unchecked Sendable {
+        private let state = NSLock()
+        private var stopped = false
+
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
@@ -53,12 +58,24 @@ final class StubServer: Sendable {
                 client?.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost))
                 return
             }
+            if reply.delay > 0 {
+                DispatchQueue.global().asyncAfter(deadline: .now() + reply.delay) { self.answer(reply) }
+            } else {
+                answer(reply)
+            }
+        }
+
+        private func answer(_ reply: Reply) {
+            // A request that stopped, for example after a time limit, gets no answer.
+            guard !state.withLock({ stopped }) else { return }
             let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: nil)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: Data(reply.body.utf8))
             client?.urlProtocolDidFinishLoading(self)
         }
 
-        override func stopLoading() {}
+        override func stopLoading() {
+            state.withLock { stopped = true }
+        }
     }
 }
