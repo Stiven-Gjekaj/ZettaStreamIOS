@@ -134,7 +134,9 @@ A choice there applies here too, if this list does not replace it.
 
 - A direct link that shows no picture in 45 seconds counts as a stream that
   did not start. The next best stream plays.
-- A torrent has no such limit, because the engine first waits for its peers.
+- A torrent has 120 seconds. Its time starts when the engine has the torrent
+  information, because the engine first waits for its peers. A torrent whose
+  peers send no data then does not hold the player.
 - Reason: VLC has no read time limit. A file host that sends too slowly held
   the player on a black screen with no fault. ExoPlayer on Android stops such
   a stream with a time-out error.
@@ -167,6 +169,9 @@ A choice there applies here too, if this list does not replace it.
   - The shoulder buttons change the episode or the channel.
 - Command and 1 to 5 open the tabs. The numbers alone type into the search
   field, so the shortcut needs Command.
+- Escape comes through a key command with priority, because UIKit uses it
+  for its own commands. No test covers it: the Escape key of XCUITest does
+  not reach the app in the simulator, while the other keys do.
 - A game controller does not move through the screens outside the player.
   Reason: SwiftUI on iOS has no focus for a game controller.
 
@@ -178,4 +183,64 @@ A choice there applies here too, if this list does not replace it.
   time. A guide of 321 MB needs 31 MB of memory in place of 383 MB.
 - Reason: the Android app keeps the files in its HTTP cache for these times,
   and reads the guide as a stream.
+
+
+## 2026-10-21: The addons and the catalogs on the disk
+
+- The manifest of each addon and the last answer of each catalog stay in the
+  cache folder. A catalog keeps at most 100 titles.
+- At the start, the addons and the rows of Home come from these files at
+  once. Then the answers of the addons replace them.
+- An addon that does not answer, for example with no network, works with its
+  manifest from the disk. It does not show as a failure.
+- The Kitsu IDs of the MyAnimeList IDs also stay on the disk. An ID that Kitsu
+  does not know is asked again at the next start.
+- When the network comes back, and when the app comes to the front, the
+  addons and the playlists that failed try again.
+- Reason: the app downloaded all manifests at each start before Home showed a
+  row.
+
+## 2026-10-21: HLS faults
+
+- An HLS stream gets 6 reconnects in place of 3.
+- After two faults in a row, the reconnect sets a lower largest height, such
+  as 720p after 1080p, for one minute.
+- Reason: the Android app gives each part of an HLS stream more tries, and
+  takes a part from a lower quality for one minute. VLC has no rule for each
+  part, so the app does this at each reconnect. VLC does not go back to the
+  higher quality in the same connection, so the higher quality comes at the
+  next reconnect.
+
+## 2026-10-21: The free space for a torrent
+
+- A torrent starts only with 1 GB of free space on the device.
+- A torrent that plays stops below 300 MB of free space, and its data goes.
+- The data of a torrent from a run that the system stopped goes at the start
+  of the app.
+- Reason: the engine keeps the part of the file that played until the torrent
+  stops. A long video can fill a small device.
+
+## 2026-10-21: Checks of the outside services and of the full app
+
+- The workflow "Services" asks AniList, Shikimori, TVmaze, Kitsu, AniSkip,
+  OpenSubtitles, and GitHub each day, with the code of the app.
+- The workflow "End to end" goes through the app in a simulator each week,
+  with the sources of the secret `ZS_E2E_SOURCES`. Its log holds only the
+  names and the results of the tests, and it keeps no screenshots, because
+  these can show the sources.
+- Reason: AniList turned off its API, and the app showed no anime pictures,
+  with no fault in the tests.
+
+## 2026-10-21: The accessibility audit
+
+- The UI test `AccessibilityChecks` runs the audit of Xcode on Home, Search,
+  Library, Live TV, and Settings.
+- A missing label, a small touch target, a wrong trait, and text with no
+  Dynamic Type fail the test.
+- Contrast, clipped text, and partial Dynamic Type show only as notes. A title
+  on one line ends with "...", text can sit on the art of a poster, and the
+  subtitle font row shows the text in its own font.
+- All text uses `Font.custom` with a text style, so that it follows Dynamic
+  Type when the setting changes.
+- A loading bar is hidden from VoiceOver, because it is too small to touch.
 

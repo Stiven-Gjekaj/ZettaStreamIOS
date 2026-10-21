@@ -10,6 +10,8 @@ release is out. The reason for each choice is in
 
 ## Next
 
-- Check 0.1.0 on a real iPhone and a real iPad: live TV, the player options,
-  backup and restore, the profile editor, Picture in Picture, and the next
-  episode. 1.0.0 comes after all the checks pass.
+- Check Picture in Picture and the Escape key on a real iPhone and a real
+  iPad. The simulator checks of `DeviceChecks` cover live TV, the player
+  options, backup, the profile editor, and the next episode. In the simulator,
+  the test streams did not offer Picture in Picture, and the Escape key of
+  XCUITest does not reach the app.
