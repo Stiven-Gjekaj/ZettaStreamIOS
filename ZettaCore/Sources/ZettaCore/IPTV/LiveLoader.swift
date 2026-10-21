@@ -59,7 +59,7 @@ public struct LiveLoader: Sendable {
         if !ids.isEmpty {
             let from = now - 3 * Self.hour, to = now + 24 * Self.hour
             let guides = await inOrder(guideUrls) { url in
-                try Xmltv.parse(try await client.data(url, keepFor: Self.guideKeep), channelIds: ids, from: from, to: to)
+                try Xmltv.parse(file: try await client.file(url, keepFor: Self.guideKeep), channelIds: ids, from: from, to: to)
             }
             for (url, result) in zip(guideUrls, guides) {
                 switch result {

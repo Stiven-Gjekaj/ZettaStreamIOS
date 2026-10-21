@@ -39,13 +39,27 @@ public struct FileClient: Sendable {
         }
         var request = URLRequest(url: address, timeoutInterval: 30)
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await session.data(for: request)
+        // The file goes to the disk and not into the memory, because a guide can be very large.
+        let (download, response) = try await session.download(for: request)
+        let manager = FileManager.default
+        defer { try? manager.removeItem(at: download) }
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw HTTPError(status: http.statusCode, url: url)
         }
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        try Gzip.openIfGzip(data).write(to: target, options: .atomic)
-        try FileManager.default.setAttributes([.modificationDate: clock()], ofItemAtPath: target.path)
+        try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+        let opened = folder.appendingPathComponent(UUID().uuidString)
+        defer { try? manager.removeItem(at: opened) }
+        if Gzip.isGzip(file: download) {
+            try Gzip.decode(file: download, to: opened)
+        } else {
+            try manager.moveItem(at: download, to: opened)
+        }
+        try manager.setAttributes([.modificationDate: clock()], ofItemAtPath: opened.path)
+        if manager.fileExists(atPath: target.path) {
+            _ = try manager.replaceItemAt(target, withItemAt: opened)
+        } else {
+            try manager.moveItem(at: opened, to: target)
+        }
         return target
     }
 

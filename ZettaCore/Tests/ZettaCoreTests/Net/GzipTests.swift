@@ -66,4 +66,46 @@ struct GzipTests {
         #expect(throws: GzipError.self) { try Gzip.decode(Data(playlist.prefix(16))) }
         #expect(throws: GzipError.self) { try Gzip.decode(Data([0x1f, 0x8b, 0x08])) }
     }
+
+    private func decodeFile(_ bytes: [UInt8]) throws -> Data {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("gzip-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let source = folder.appendingPathComponent("in"), target = folder.appendingPathComponent("out")
+        try Data(bytes).write(to: source)
+        #expect(Gzip.isGzip(file: source) == Gzip.isGzip(Data(bytes)))
+        try Gzip.decode(file: source, to: target)
+        return try Data(contentsOf: target)
+    }
+
+    @Test func aFileOpensIntoAFileWithTwoMembersAndTrailingBytes() throws {
+        #expect(text(try decodeFile(playlist)) == "#EXTM3U\n")
+        #expect(text(try decodeFile(playlist + two)) == "#EXTM3U\ntwo\n")
+        #expect(text(try decodeFile(playlist + [0x00, 0x00, 0x00])) == "#EXTM3U\n")
+    }
+
+    @Test func aCutFileThrows() {
+        #expect(throws: GzipError.self) { try decodeFile(Array(playlist.prefix(15))) }
+        #expect(throws: GzipError.self) { try decodeFile([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xff, 0xff, 0xff]) }
+    }
+
+    @Test func aFileLargerThanOnePartOpensTheSameAsInMemory() throws {
+        // Text that does not shrink much, so that both the input and the output need many parts.
+        var generator = SystemRandomNumberGenerator()
+        let original = Data((0..<3_000_000).map { _ in UInt8.random(in: 0x41...0x5a, using: &generator) })
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/gzip")
+        process.arguments = ["-c", "-n"]
+        let input = Pipe(), output = Pipe()
+        process.standardInput = input
+        process.standardOutput = output
+        try process.run()
+        let writer = Thread { input.fileHandleForWriting.write(original); try? input.fileHandleForWriting.close() }
+        writer.start()
+        let packed = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        #expect(packed.count > 512 * 1024)
+        #expect(try decodeFile([UInt8](packed) + [UInt8](packed)) == original + original)
+        #expect(try Gzip.decode(packed) == original)
+    }
 }

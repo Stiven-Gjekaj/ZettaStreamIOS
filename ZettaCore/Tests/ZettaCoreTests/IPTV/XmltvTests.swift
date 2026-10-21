@@ -109,4 +109,23 @@ struct XmltvTests {
             try Xmltv.parse(Data("<tv><programme".utf8), channelIds: nil, from: 0, to: 1)
         }
     }
+
+    @Test func aFileGivesTheSameGuideAsTheData() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("guide-\(UUID().uuidString).xml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data(xml.utf8).write(to: file)
+        let fromFile = try Xmltv.parse(file: file, channelIds: ["news.test"], from: ms("2026-10-08T00:00:00Z"), to: ms("2026-10-09T00:00:00Z"))
+        #expect(fromFile == (try guide()))
+        #expect(fromFile.programmes("news.test").first?.description == "The news.")
+    }
+
+    @Test func aFileThatIsNotXmlThrows() throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("guide-\(UUID().uuidString).xml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try Data("<tv><programme".utf8).write(to: file)
+        #expect(throws: (any Error).self) { try Xmltv.parse(file: file, channelIds: nil, from: 0, to: .max) }
+        #expect(throws: (any Error).self) {
+            try Xmltv.parse(file: file.appendingPathExtension("missing"), channelIds: nil, from: 0, to: .max)
+        }
+    }
 }

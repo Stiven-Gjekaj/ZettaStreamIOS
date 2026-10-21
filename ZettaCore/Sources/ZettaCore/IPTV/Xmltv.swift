@@ -91,8 +91,18 @@ public enum Xmltv {
     /// in `channelIds` and only the programmes between `from` and `to`. Nil keeps all channels.
     /// XML that is not correct throws.
     public static func parse(_ data: Data, channelIds: Set<String>?, from: Int64, to: Int64) throws -> Guide {
+        try parse(XMLParser(data: data), channelIds: channelIds, from: from, to: to)
+    }
+
+    /// Reads the guide in `file` one part at a time, so that the full file does not go
+    /// into the memory. The rules are those of `parse(_:channelIds:from:to:)`.
+    public static func parse(file: URL, channelIds: Set<String>?, from: Int64, to: Int64) throws -> Guide {
+        guard let stream = InputStream(url: file) else { throw XmltvError(message: "The guide file does not open") }
+        return try parse(XMLParser(stream: stream), channelIds: channelIds, from: from, to: to)
+    }
+
+    private static func parse(_ parser: XMLParser, channelIds: Set<String>?, from: Int64, to: Int64) throws -> Guide {
         let reader = Reader(wanted: channelIds.map { Set($0.map(channelKey)) }, from: from, to: to)
-        let parser = XMLParser(data: data)
         parser.delegate = reader
         guard parser.parse() else {
             throw parser.parserError ?? XmltvError(message: "The guide is not correct XML")
