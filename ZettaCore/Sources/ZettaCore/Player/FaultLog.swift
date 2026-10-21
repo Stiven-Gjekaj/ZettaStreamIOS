@@ -49,6 +49,8 @@ public enum FaultLog {
                          "unsupported format", "corrupt", "malformed", "invalid data"])),
         (.network, any(["connection reset", "broken pipe", "read error", "connection lost", "network",
                         "socket", "tls", "ssl", "end of stream"])),
+        // A web page gives only the general lines of VLC. They come last, because each fault writes them.
+        (.notVideo, any(["can't be opened", "unable to open the mrl"])),
     ]
 }
 

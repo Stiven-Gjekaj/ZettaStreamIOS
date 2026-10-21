@@ -23,6 +23,17 @@ struct FaultLogTests {
         #expect(FaultLog.fault(["CONNECTION REFUSED"]) == .noConnection)
     }
 
+    /// The lines that VLC 4 wrote on a Mac for a refused link, an unknown host, and a web page.
+    @Test func theLinesOfVLCGiveTheFault() {
+        let general = ["Your media can't be opened", "VLC is unable to open the MRL 'https://a.test/'. Check the log for details."]
+        #expect(FaultLog.fault(["HTTP 403 error"] + general) == .refused)
+        #expect(FaultLog.fault(["cannot resolve a.test port 443: nodename nor servname provided, or not known",
+                                "HTTP connection failure"] + general) == .noConnection)
+        #expect(FaultLog.fault(general) == .notVideo)
+        #expect(FaultLog.fault(["connection reset by peer"] + general) == .network)
+        #expect(FaultLog.reason(["HTTP 403 error"] + general) == "HTTP 403 error")
+    }
+
     @Test func aNumberThatIsNotAStatusIsNotARefusal() {
         #expect(FaultLog.fault(["picture 404 is late"]) != .refused)
         #expect(FaultLog.fault(["http 200 ok", "socket closed"]) == .network)
