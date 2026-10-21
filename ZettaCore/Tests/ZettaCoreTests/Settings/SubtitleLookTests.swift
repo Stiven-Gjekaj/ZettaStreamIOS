@@ -1,9 +1,25 @@
+import Foundation
 import Testing
 @testable import ZettaCore
 
 struct SubtitleLookTests {
     @Test func theBackgroundOpacityGoesFromNoneToSolid() {
         #expect(SubtitleBackground.allCases.map(\.alpha) == [0, 64, 128, 191, 255])
+    }
+
+    @Test func theDefaultsAreWhiteTextWithAnOutlineAndNoBox() {
+        let s = ViewerSettings()
+        #expect(s.subtitleColor == .white)
+        #expect(s.subtitleBackground == .none)
+        #expect(s.subtitleEdge == .outline)
+    }
+
+    @Test func aFileFromVersion020KeepsTheOldValuesAndGetsTheNewDefaults() throws {
+        let file = try temporaryFolder().appendingPathComponent("settings.json")
+        try Data(#"{"subtitlesOn":true,"subtitleSize":"Large"}"#.utf8).write(to: file)
+        let s = SettingsStore(file: file).settings
+        #expect(s.subtitleSize == .large)
+        #expect(s.subtitleFont == .default)
     }
 
     @Test func eachChoiceHasTheNameOfTheAndroidApp() {
