@@ -27,7 +27,7 @@ public final class SourceStore: @unchecked Sendable {
     public func replace(_ text: String) throws -> [Source] {
         let parsed = SourceList.parse(text)
         try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(SourceList.format(parsed).utf8).write(to: file, options: [.atomic, .completeFileProtection])
+        try Data(SourceList.format(parsed).utf8).write(to: file, options: .atomic)
         lock.withLock { current = parsed }
         return parsed
     }
