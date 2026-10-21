@@ -78,6 +78,38 @@ public enum Display {
         return metahubPoster.stringByReplacingMatches(in: url, range: range, withTemplate: "$1small$3")
     }
 
+    /// True for a series whose episode list is one placeholder: a single video with an ID of
+    /// four parts, such as `kitsu:7442:1:1`, that some addons give when they do not know the
+    /// episodes. A film, and a series with no episodes, are not placeholders.
+    public static func isPlaceholder(_ meta: Meta) -> Bool {
+        guard meta.type != "movie", meta.videos.count == 1 else { return false }
+        return meta.videos[0].id.split(separator: ":", omittingEmptySubsequences: false).count >= 4
+    }
+
+    private static let youTubeId = try! NSRegularExpression(pattern: "^[A-Za-z0-9_-]{6,20}$")
+
+    /// The YouTube ID of the trailer. Cinemeta gives `trailerStreams` with `ytId`, and other
+    /// addons give `trailers` with `source` and `type`.
+    public static func trailer(_ meta: Meta) -> String? {
+        func field(_ e: JSONValue, _ name: String) -> String? { e.objectValue == nil ? nil : e[name]?.stringValue }
+        let ids = meta.trailerStreams.compactMap { field($0, "ytId") }
+            + meta.trailers.filter { (field($0, "type") ?? "Trailer").lowercased() == "trailer" }.compactMap { field($0, "source") }
+        return ids.first { youTubeId.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil }
+    }
+
+    /// The names in a list of people. A name can be a text or an object with a name.
+    public static func people(_ list: [JSONValue], limit: Int = 6) -> [String] {
+        var names: [String] = []
+        guard limit > 0 else { return names }
+        for e in list {
+            let raw: String? = e.objectValue != nil ? e["name"]?.stringValue : e.stringValue
+            guard let name = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty, !names.contains(name) else { continue }
+            names.append(name)
+            if names.count == limit { break }
+        }
+        return names
+    }
+
     public static func preview(_ m: MetaPreview) -> MetaPreview {
         var copy = m
         copy.name = englishName(m.name, aliases: m.aliases)

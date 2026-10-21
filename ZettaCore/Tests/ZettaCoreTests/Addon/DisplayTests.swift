@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import ZettaCore
 
@@ -65,5 +66,41 @@ struct DisplayTests {
         #expect(Display.cardPoster("https://images.metahub.space/poster/small/tt1/img") == "https://images.metahub.space/poster/small/tt1/img")
         #expect(Display.cardPoster("https://media.kitsu.app/anime/1/poster.jpg") == "https://media.kitsu.app/anime/1/poster.jpg")
         #expect(Display.cardPoster(nil) == nil)
+    }
+
+    private func meta(_ id: String, _ type: String, videos: [String] = []) -> Meta {
+        var meta = Meta(preview: MetaPreview(id: id, type: type))
+        meta.videos = videos.map { Video(id: $0) }
+        return meta
+    }
+
+    @Test func aSeriesWithOnePlaceholderEpisodeIsAPlaceholder() {
+        #expect(Display.isPlaceholder(meta("kitsu:7442", "series", videos: ["kitsu:7442:1:1"])))
+        #expect(!Display.isPlaceholder(meta("kitsu:7442", "series", videos: ["kitsu:7442:1", "kitsu:7442:2"])))
+        #expect(!Display.isPlaceholder(meta("tt1", "series", videos: ["tt1:1:1"])))
+        #expect(!Display.isPlaceholder(meta("tt2", "movie", videos: ["tt2:a:b:c"])))
+    }
+
+    private func list(_ text: String) throws -> [JSONValue] {
+        try #require(try JSONValue.parse(Data(text.utf8)).arrayValue)
+    }
+
+    @Test func theTrailerComesFromEitherForm() throws {
+        var cinemeta = meta("tt1", "movie")
+        cinemeta.trailerStreams = try list(#"[{"title":"A","ytId":"PLl99DlL6b4"}]"#)
+        #expect(Display.trailer(cinemeta) == "PLl99DlL6b4")
+        var other = meta("k", "series")
+        other.trailers = try list(#"[{"source":"LHtdKWJdif4","type":"Trailer"}]"#)
+        #expect(Display.trailer(other) == "LHtdKWJdif4")
+        other.trailers = try list(#"[{"source":"x y","type":"Trailer"}]"#)
+        #expect(Display.trailer(other) == nil)
+        other.trailers = try list(#"[{"source":"LHtdKWJdif4","type":"Clip"}]"#)
+        #expect(Display.trailer(other) == nil)
+    }
+
+    @Test func peopleCanBeTextsOrObjects() throws {
+        let people = try list(#"["Tim Robbins", {"name":"Morgan Freeman"}, "", 3, "Tim Robbins"]"#)
+        #expect(Display.people(people) == ["Tim Robbins", "Morgan Freeman", "3"])
+        #expect(Display.people(people, limit: 1) == ["Tim Robbins"])
     }
 }
