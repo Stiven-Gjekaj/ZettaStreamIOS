@@ -105,6 +105,18 @@ struct StreamOrderTests {
         #expect(!StreamOrder.isIdeal(weak, preferDirect: false))
     }
 
+    @Test func theShortLabelKeepsTheNameTheResolutionAndTheSize() {
+        let stream = AddonStream(url: "https://cdn.test/1.m3u8", name: "🎬MultiMoviesProvider 🧊 1080p • CNCVerse Bridge", title: "1.4 GB")
+        #expect(StreamOrder.shortLabel(ListedStream(addon: addon("CNCVerse"), stream: stream)) == "MultiMoviesProvider · 1080p · 1.4 GB")
+        let torrent = AddonStream(infoHash: String(repeating: "c", count: 40), name: "Torrentio\n1080p")
+        #expect(StreamOrder.shortLabel(ListedStream(addon: addon("T"), stream: torrent)) == "Torrentio · Torrent · 1080p")
+    }
+
+    @Test func withNoNameTheShortLabelUsesTheAddon() {
+        let stream = AddonStream(url: "https://cdn.test/1.m3u8", name: "🎬 1080p")
+        #expect(StreamOrder.shortLabel(ListedStream(addon: addon("CNCVerse"), stream: stream)) == "CNCVerse · 1080p")
+    }
+
     private func sized(_ name: String, gb: Double, seeds: Int) -> AddonStream {
         AddonStream(infoHash: String(name.padding(toLength: 40, withPad: "x", startingAt: 0)), name: "\(name) 1080p", title: "👤 \(seeds) 💾 \(gb) GB")
     }

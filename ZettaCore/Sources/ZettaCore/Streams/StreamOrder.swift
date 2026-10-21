@@ -112,6 +112,27 @@ public enum StreamOrder {
             && !tooBig(listed, maxTorrentBytes) && !almostNoSeeders(listed)
     }
 
+    private static let labelNoise = StreamRegex(#"[^\p{L}\p{N} .,:+&'()\[\]-]"#)
+    private static let labelResolution = StreamRegex(#"(?i)\b(2160|1080|720|480)p\b"#)
+    private static let labelSpaces = StreamRegex(#"\s+"#)
+
+    /// A short name for the stream that plays, such as "MultiMoviesProvider · 1080p · 1.4 GB".
+    /// The first line of the stream name loses its emoji and its repeated resolution.
+    public static func shortLabel(_ listed: ListedStream) -> String {
+        let line = (listed.stream.name ?? "").split(omittingEmptySubsequences: false) { $0 == "\n" || $0 == "\r" || $0 == "\r\n" }
+            .first.map(String.init) ?? ""
+        let part = line.split(omittingEmptySubsequences: false) { $0 == "•" || $0 == "|" }.first.map(String.init) ?? ""
+        var name = labelSpaces.replacing(in: labelResolution.replacing(in: labelNoise.replacing(in: part, with: " "), with: " "), with: " ")
+        name = String(name.trimmingCharacters(in: .whitespaces).prefix(32))
+        if name.isEmpty { name = listed.addon.name }
+        return [
+            name,
+            listed.stream.isTorrent ? "Torrent" : nil,
+            listed.info.resolution.map(StreamInfo.resolutionLabel),
+            listed.info.sizeBytes.map(StreamInfo.formatSize),
+        ].compactMap { $0 }.joined(separator: " · ")
+    }
+
     /// 0 for 1080p. Lower resolutions rank before higher ones. An unknown resolution ranks last.
     private static func resolutionRank(_ resolution: Int?) -> Int {
         guard let resolution else { return Int.max }
