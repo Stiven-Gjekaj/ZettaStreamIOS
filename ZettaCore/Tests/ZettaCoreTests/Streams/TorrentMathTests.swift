@@ -64,6 +64,24 @@ struct TorrentMathTests {
         #expect(TorrentMath.chooseFile(names: ["a.mkv", "b.mkv"], sizes: [7, 7], preferred: nil) == 0)
     }
 
+    @Test func rangesReadEachForm() {
+        #expect(TorrentMath.range(header: nil, size: 1000) == 0..<1000)
+        #expect(TorrentMath.range(header: "bytes=100-", size: 1000) == 100..<1000)
+        #expect(TorrentMath.range(header: "bytes=100-199", size: 1000) == 100..<200)
+        #expect(TorrentMath.range(header: "bytes=-100", size: 1000) == 900..<1000)
+        #expect(TorrentMath.range(header: "bytes=990-5000", size: 1000) == 990..<1000)
+        #expect(TorrentMath.range(header: "bytes=1000-", size: 1000) == nil)
+        #expect(TorrentMath.range(header: "bytes=500-100", size: 1000) == nil)
+    }
+
+    @Test func aRangeUsesOnlyItsFirstPart() {
+        #expect(TorrentMath.range(header: "bytes= 0-9 , 20-29", size: 1000) == 0..<10)
+        #expect(TorrentMath.range(header: "items=0-9", size: 1000) == 0..<1000)
+        #expect(TorrentMath.range(header: "bytes=-5000", size: 1000) == 0..<1000)
+        #expect(TorrentMath.range(header: "bytes=a-", size: 1000) == nil)
+        #expect(TorrentMath.range(header: nil, size: 0) == nil)
+    }
+
     @Test func onlyTheHeadTheTailAndTheWindowAreWanted() {
         let wanted = TorrentMath.wanted(firstPiece: 10, lastPiece: 109, readPiece: 50, aheadPieces: 5, edgePieces: 2)
         #expect(wanted == [10, 11, 108, 109, 50, 51, 52, 53, 54, 55])

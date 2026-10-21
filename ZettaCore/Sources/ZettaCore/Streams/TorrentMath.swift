@@ -154,6 +154,27 @@ public enum TorrentMath {
         max(1, Int((bytes + Int64(pieceLength) - 1) / Int64(pieceLength)))
     }
 
+    /// Reads an HTTP `Range` header such as `bytes=100-` or `bytes=100-199`.
+    /// Gives the whole file when there is no header, and nil when the range
+    /// is outside the file. The end of the result is not in the range.
+    public static func range(header: String?, size: Int64) -> Range<Int64>? {
+        if size <= 0 { return nil }
+        guard let header, header.hasPrefix("bytes=") else { return 0..<size }
+        let spec = String(header.dropFirst("bytes=".count).prefix { $0 != "," }).trimmingCharacters(in: .whitespacesAndNewlines)
+        let dash = spec.firstIndex(of: "-")
+        let start = String(spec[..<(dash ?? spec.endIndex)]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let end = dash.map { String(spec[spec.index(after: $0)...]).trimmingCharacters(in: .whitespacesAndNewlines) } ?? ""
+        if start.isEmpty && !end.isEmpty {
+            // A suffix range: the last N bytes.
+            guard let n = Int64(end) else { return nil }
+            return min(max(size - n, 0), size)..<size
+        }
+        guard let s = Int64(start) else { return nil }
+        let e = Int64(end).map { min($0, size - 1) } ?? (size - 1)
+        if s >= size || s > e { return nil }
+        return s..<(e + 1)
+    }
+
     /// The extension of a name after its last dot, in lower case. Empty when there is no dot.
     private static func fileExtension(_ name: String) -> String {
         name.lastIndex(of: ".").map { name[name.index(after: $0)...].lowercased() } ?? ""
