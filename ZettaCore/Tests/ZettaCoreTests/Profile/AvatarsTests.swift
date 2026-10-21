@@ -122,14 +122,15 @@ struct AvatarsTests {
         anilist.reply("disabled", status: 403)
         for _ in Avatars.featuredShows { tvmaze.reply("[]") }
         shikimori.reply(#"[{"id":10,"name":"A"},{"id":20,"name":"B"}]"#)
-        shikimori.reply("[" + (1...8).map { role("A\($0)", $0, main: $0 == 8) }.joined(separator: ",") + "]")
-        shikimori.reply("[" + role("B1", 1) + "," + role("B9", 9) + "]")
+        shikimori.reply(path: "/api/animes/10/roles", "[" + (1...8).map { role("A\($0)", $0, main: $0 == 8) }.joined(separator: ",") + "]")
+        shikimori.reply(path: "/api/animes/20/roles", "[" + role("B1", 1) + "," + role("B9", 9) + "]")
         let groups = await avatars.featured()
         let names = groups.first?.avatars.map(\.name) ?? []
         #expect(groups.map(\.title) == ["Anime"])
         // Each anime gives its first characters, main first. "B1" has the picture of "A1", so it is left out.
         #expect(names == ["A8", "A1", "A2", "A3", "A4", "A5", "B9"])
-        #expect(shikimori.paths == ["/api/animes", "/api/animes/10/roles", "/api/animes/20/roles"])
+        #expect(shikimori.paths.first == "/api/animes")
+        #expect(Set(shikimori.paths.dropFirst()) == ["/api/animes/10/roles", "/api/animes/20/roles"])
         #expect(shikimori.lastRequest?.value(forHTTPHeaderField: "User-Agent") == "ZettaStream")
     }
 
@@ -142,6 +143,15 @@ struct AvatarsTests {
         let names = await avatars.search("frieren").first?.avatars.map(\.name)
         #expect(names == ["Frieren", "Fern"])
         #expect(shikimori.paths == ["/api/characters/search", "/api/animes", "/api/animes/52991/roles"])
+    }
+
+    @Test func theCastsOfManyAnimeKeepTheOrderOfTheAnime() async {
+        anilist.reply("disabled", status: 403)
+        for _ in Avatars.featuredShows { tvmaze.reply("[]") }
+        shikimori.reply("[" + (1...6).map { #"{"id":\#($0),"name":"A"}"# }.joined(separator: ",") + "]")
+        for id in 1...6 { shikimori.reply(path: "/api/animes/\(id)/roles", "[" + role("C\(id)", id) + "]") }
+        let names = await avatars.featured().first?.avatars.map(\.name)
+        #expect(names == (1...6).map { "C\($0)" })
     }
 
     @Test func aWorkingAniListDoesNotAskShikimori() async {

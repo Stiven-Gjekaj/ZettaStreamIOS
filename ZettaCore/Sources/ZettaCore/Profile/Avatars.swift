@@ -34,6 +34,8 @@ public struct Avatars: Sendable {
     public static let shikimoriAnime = 8
     /// The number of characters of each of those anime.
     public static let shikimoriRoles = 6
+    /// The requests to Shikimori that go at the same time.
+    static let shikimoriGroup = 4
 
     private let session: URLSession
     private let anilistUrl: String
@@ -82,12 +84,23 @@ public struct Avatars: Sendable {
         let found = await anilist(nil)
         guard found.isEmpty else { return found }
         let popular = Parse.shikimoriAnime(await get("\(shikimoriUrl)/api/animes?order=popularity&limit=\(Self.shikimoriAnime)"))
-        // Shikimori lets a client send 5 requests in each second, so the requests go one at a time.
-        var all: [Avatar] = []
-        for id in popular {
-            all += Parse.shikimoriRoles(await get("\(shikimoriUrl)/api/animes/\(id)/roles"), base: shikimoriUrl).prefix(Self.shikimoriRoles)
+        // Shikimori lets a client send 5 requests in each second, so the requests go in groups of 4.
+        var casts = [[Avatar]](repeating: [], count: popular.count)
+        for start in stride(from: 0, to: popular.count, by: Self.shikimoriGroup) {
+            let ids = Array(popular[start..<min(start + Self.shikimoriGroup, popular.count)])
+            await withTaskGroup(of: (Int, [Avatar]).self) { group in
+                for (offset, id) in ids.enumerated() {
+                    group.addTask {
+                        // The index goes into a constant before the first await. See AddonRepository.install.
+                        let index = start + offset
+                        let roles = Parse.shikimoriRoles(await get("\(shikimoriUrl)/api/animes/\(id)/roles"), base: shikimoriUrl)
+                        return (index, Array(roles.prefix(Self.shikimoriRoles)))
+                    }
+                }
+                for await (index, cast) in group { casts[index] = cast }
+            }
         }
-        return Self.unique(all)
+        return Self.unique(casts.flatMap { $0 })
     }
 
     /// The characters whose name has `query`, and the characters of the anime whose title has it.

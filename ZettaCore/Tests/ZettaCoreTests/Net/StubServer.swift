@@ -13,6 +13,8 @@ final class StubServer: Sendable {
 
     fileprivate static let lock = NSLock()
     nonisolated(unsafe) fileprivate static var replies: [String: [Reply]] = [:]
+    /// The answers for one path of a host. They come before the answers in order.
+    nonisolated(unsafe) fileprivate static var pathReplies: [String: [Reply]] = [:]
     nonisolated(unsafe) fileprivate static var requests: [String: [URLRequest]] = [:]
 
     let host = "h\(UUID().uuidString.prefix(8).lowercased()).test"
@@ -33,6 +35,12 @@ final class StubServer: Sendable {
     func reply(data: Data, status: Int = 200, headers: [String: String] = [:], delay: TimeInterval = 0) {
         let reply = Reply(status: status, body: data, headers: headers, delay: delay)
         Self.lock.withLock { Self.replies[host, default: []].append(reply) }
+    }
+
+    /// Answers a request for `path` only, whatever the order of the requests.
+    func reply(path: String, _ body: String, status: Int = 200) {
+        let reply = Reply(status: status, body: Data(body.utf8))
+        Self.lock.withLock { Self.pathReplies[host + path, default: []].append(reply) }
     }
 
     /// The paths that the code asked for, in order.
@@ -56,6 +64,12 @@ final class StubServer: Sendable {
             let host = request.url?.host ?? ""
             let reply: Reply? = StubServer.lock.withLock {
                 StubServer.requests[host, default: []].append(request)
+                let key = host + (request.url?.path ?? "")
+                if var byPath = StubServer.pathReplies[key], !byPath.isEmpty {
+                    let first = byPath.removeFirst()
+                    StubServer.pathReplies[key] = byPath
+                    return first
+                }
                 guard var queue = StubServer.replies[host], !queue.isEmpty else { return nil }
                 let first = queue.removeFirst()
                 StubServer.replies[host] = queue
