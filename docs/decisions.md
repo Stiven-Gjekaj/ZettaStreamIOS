@@ -138,3 +138,15 @@ A choice there applies here too, if this list does not replace it.
 - Reason: VLC has no read time limit. A file host that sends too slowly held
   the player on a black screen with no fault. ExoPlayer on Android stops such
   a stream with a time-out error.
+
+## 2026-10-21: Release builds and task groups
+
+- In a task group, each task copies its index into a constant before its first
+  `await`.
+- The core tests run in a debug build and in a release build, on each push and
+  before each release.
+- Reason: in 0.1.0, the Swift 6.4 optimizer gave the index 0 to each task of
+  the addon install, because the task read the loop value after an `await`
+  inside a `do` block. All answers went into the first place, so the app kept
+  one addon of a long list, and the other addons seemed to hang. The debug
+  tests passed, because the debug build does not have the fault.
