@@ -984,7 +984,9 @@ final class PlayerController: ObservableObject {
         if videoRect == nil { updateVideoRect() }
         guard ambientNeeded else { return }
         if player.isPlaying || !ambientCopied {
-            player.saveVideoSnapshot(at: snapshotPath, withWidth: Int32(Ambient.width), andHeight: Int32(Ambient.height))
+            // The PNG writer of VLC fails at the tiny size of the fill ("block size too small"),
+            // so the copy is five times larger. The reader scales it down.
+            player.saveVideoSnapshot(at: snapshotPath, withWidth: Int32(Ambient.width * 5), andHeight: Int32(Ambient.height * 5))
         }
         if player.isPlaying { ambientCopied = false }
     }
