@@ -4,6 +4,11 @@
 set -eu
 
 cd "$(dirname "$0")/.."
+# Build the torrent engine when it is missing or older than its Go sources.
+engine=Frameworks/ZettaTorrent.xcframework/Info.plist
+if [ ! -f "$engine" ] || [ -n "$(find Torrent \( -name '*.go' -o -name go.mod -o -name go.sum \) -newer "$engine")" ]; then
+  ./scripts/build-torrent.sh
+fi
 xcodegen --quiet
 xcodebuild \
   -project ZettaStream.xcodeproj \
