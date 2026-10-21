@@ -51,6 +51,13 @@ public actor AddonRepository {
     private var generation = 0
     private var streamCache: [String: (Date, [StreamGroup])] = [:]
     private var catalogCache: [String: [MetaPreview]] = [:]
+    private var searchCache: [String: (Date, [MetaPreview])] = [:]
+
+    /// How long the app keeps the results of a search: 10 minutes.
+    public static let searchKeep: TimeInterval = 10 * 60
+
+    /// The time between two updates of the search results while addons answer.
+    static let searchUpdate: Duration = .milliseconds(300)
 
     /// How long a list of streams stays in memory: 15 minutes.
     public static let streamKeep: TimeInterval = 15 * 60
@@ -160,6 +167,70 @@ public actor AddonRepository {
         let metas = try await client.catalog(row.addon, row.catalog, extras: row.extras)
         catalogCache[row.key] = metas
         return metas
+    }
+
+    /// Searches each catalog that supports a search. Results come as they arrive, as one list
+    /// where each title shows one time and the best match comes first. The last list holds
+    /// all answers. The same search within `searchKeep` answers from memory.
+    public func search(_ query: String) -> AsyncStream<[MetaPreview]> {
+        let key = SearchRank.normalize(query)
+        if let (time, all) = searchCache[key], clock().timeIntervalSince(time) < Self.searchKeep {
+            return AsyncStream { continuation in
+                continuation.yield(all)
+                continuation.finish()
+            }
+        }
+        let catalogs = state.addons.flatMap { a in a.manifest.catalogs.filter(\.supportsSearch).map { (a, $0) } }
+        let client = client
+        return AsyncStream { continuation in
+            // The task does not run on this actor, so a merge never holds back the other requests.
+            let task = Task.detached {
+                // One answer for each catalog, in the order of the source list, so the order does not depend on speed.
+                let answers = Answers(count: catalogs.count)
+                // A change that comes while an update waits joins the next update.
+                let (changes, changed) = AsyncStream.makeStream(of: Void.self, bufferingPolicy: .bufferingNewest(1))
+                let updates = Task {
+                    for await _ in changes {
+                        continuation.yield(SearchRank.merge(query: query, answers: answers.all))
+                        try? await Task.sleep(for: Self.searchUpdate)
+                        if Task.isCancelled { break }
+                    }
+                }
+                await withTaskGroup(of: Void.self) { group in
+                    for (i, (addon, catalog)) in catalogs.enumerated() {
+                        group.addTask {
+                            let metas = (try? await client.catalog(addon, catalog, extras: [("search", query)])) ?? []
+                            answers.set(i, metas)
+                            changed.yield()
+                        }
+                    }
+                }
+                updates.cancel()
+                changed.finish()
+                await updates.value
+                let all = SearchRank.merge(query: query, answers: answers.all)
+                if !catalogs.isEmpty && !Task.isCancelled { await self.keepSearch(key, all) }
+                continuation.yield(all)
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    private func keepSearch(_ key: String, _ all: [MetaPreview]) {
+        searchCache[key] = (clock(), all)
+    }
+
+    /// The answers of a search, which the requests write at the same time.
+    private final class Answers: @unchecked Sendable {
+        private let lock = NSLock()
+        private var lists: [[MetaPreview]?]
+
+        init(count: Int) { lists = Array(repeating: nil, count: count) }
+
+        func set(_ index: Int, _ metas: [MetaPreview]) { lock.withLock { lists[index] = metas } }
+
+        var all: [[MetaPreview]] { lock.withLock { lists.compactMap { $0 } } }
     }
 
     /// Gets the full details from the first addon that has them.

@@ -229,6 +229,54 @@ struct AddonRepositoryTests {
         #expect(meta.videos.isEmpty)
     }
 
+    private func last(_ stream: AsyncStream<[MetaPreview]>) async -> (lists: Int, last: [MetaPreview]) {
+        var count = 0
+        var final: [MetaPreview] = []
+        for await list in stream {
+            count += 1
+            final = list
+        }
+        return (count, final)
+    }
+
+    @Test func aSearchMergesTheAnswersAndTheSameSearchAnswersFromMemory() async {
+        let other = StubServer()
+        good.reply(goodManifest)
+        other.reply(goodManifest.replacingOccurrences(of: "Good", with: "Other"))
+        let clock = TestClock()
+        let repository = AddonRepository(client: client, fallbackSubtitlesUrl: nil, clock: { clock.now })
+        await repository.install(sources(good, other))
+        good.reply(#"{"metas":[{"id":"tt1","type":"movie","name":"Dune","releaseInfo":"2021"},{"id":"tt2","type":"movie","name":"Dune Part Two"}]}"#)
+        other.reply(#"{"metas":[{"id":"x:1","type":"movie","name":"Dune","releaseInfo":"2021","poster":"https://p.test/d.jpg"}]}"#, delay: 0.1)
+        let first = await last(repository.search("Dune"))
+        #expect(first.last.map(\.id) == ["tt1", "tt2"])
+        #expect(first.last.first?.poster == "https://p.test/d.jpg")
+        #expect(good.paths.last == "/catalog/movie/find/search=Dune.json")
+
+        // Another form of the same text answers from memory, with one list and no request.
+        let before = good.paths.count + other.paths.count
+        let again = await last(repository.search("dune!"))
+        #expect(again.lists == 1)
+        #expect(again.last == first.last)
+        #expect(good.paths.count + other.paths.count == before)
+
+        // After the keep time, the search asks the addons again.
+        clock.now = Date(timeIntervalSince1970: AddonRepository.searchKeep)
+        good.reply(#"{"metas":[]}"#)
+        other.reply(#"{"metas":[]}"#)
+        #expect(await last(repository.search("Dune")).last.isEmpty)
+        #expect(good.paths.count + other.paths.count == before + 2)
+    }
+
+    @Test func aSearchWithNoSearchCatalogGivesOneEmptyList() async {
+        good.reply(metaManifest)
+        let repository = repository()
+        await repository.install(sources(good))
+        let result = await last(repository.search("Dune"))
+        #expect(result.lists == 1)
+        #expect(result.last.isEmpty)
+    }
+
     @Test func onlyTheAddonsOfTheListAreInstalled() async {
         good.reply(goodManifest)
         let repository = repository()
