@@ -397,7 +397,8 @@ final class PlayerController: ObservableObject {
             updateTime()
             checkResume()
         case .trackAdded(let id, let isText):
-            if isText, !pendingSlaves.isEmpty { slaveTracks[pendingSlaves.removeFirst()] = id }
+            // VLC names the tracks of the stream "spu/auto/N", and an added subtitle "<hash>/spu/N".
+            if isText, !id.hasPrefix("spu/auto/"), !pendingSlaves.isEmpty { slaveTracks[pendingSlaves.removeFirst()] = id }
             refreshTracks()
         case .tracksChanged: refreshTracks()
         case .snapshot: readSnapshot()
