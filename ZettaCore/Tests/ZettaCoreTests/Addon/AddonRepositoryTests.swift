@@ -125,6 +125,66 @@ struct AddonRepositoryTests {
         #expect(await repository.cachedStreams(type: "series", videoId: "tt1:1:1", withTorrents: true) == nil)
     }
 
+    @Test func withNoSubtitleAddonTheFallbackGivesSubtitles() async {
+        let subs = StubServer()
+        subs.reply(subsManifest)
+        subs.reply(#"{"subtitles":[{"id":"1","url":"https://s.test/1.srt","lang":"eng"}]}"#)
+        good.reply(goodManifest)
+        let repository = repository(fallback: subs.url("/manifest.json"))
+        await repository.install(sources(good))
+        #expect(await repository.subtitles(type: "movie", videoId: "tt1").map(\.url) == ["https://s.test/1.srt"])
+        #expect(subs.paths == ["/manifest.json", "/subtitles/movie/tt1.json"])
+    }
+
+    @Test func withASubtitleAddonTheFallbackIsNotAsked() async {
+        let subs = StubServer()
+        let fallback = StubServer()
+        subs.reply(subsManifest)
+        let repository = repository(fallback: fallback.url("/manifest.json"))
+        await repository.install(sources(subs))
+        subs.reply(#"{"subtitles":[{"id":"1","url":"https://s.test/1.srt","lang":"eng"}]}"#)
+        #expect(await repository.subtitles(type: "movie", videoId: "tt1").count == 1)
+        #expect(fallback.paths.isEmpty)
+    }
+
+    @Test func aSlowSubtitleAddonDoesNotHoldBackTheOthers() async {
+        let subs = StubServer()
+        let slow = StubServer()
+        subs.reply(subsManifest)
+        slow.reply(#"{"id":"w","name":"Slow","types":["movie"],"idPrefixes":["tt"],"resources":["subtitles"],"catalogs":[]}"#)
+        let repository = AddonRepository(client: client, fallbackSubtitlesUrl: nil, subtitleWait: .seconds(1))
+        await repository.install(sources(subs, slow))
+        #expect(await repository.state.addons.count == 2)
+        subs.reply(#"{"subtitles":[{"id":"1","url":"https://s.test/1.srt","lang":"eng"}]}"#)
+        slow.reply(#"{"subtitles":[{"id":"2","url":"https://s.test/2.srt","lang":"eng"}]}"#, delay: 5)
+        let start = Date()
+        #expect(await repository.subtitles(type: "movie", videoId: "tt1").map(\.url) == ["https://s.test/1.srt"])
+        #expect(Date().timeIntervalSince(start) < 3)
+    }
+
+    @Test func anAddonThatKnowsOnlyImdbGetsTheImdbFormOfAnAnimeId() async {
+        let subs = StubServer()
+        subs.reply(subsManifest)
+        let repository = repository()
+        await repository.install(sources(subs))
+        subs.reply(#"{"subtitles":[{"id":"3","url":"https://s.test/3.srt","lang":"eng"}]}"#)
+        let found = await repository.subtitles(type: "anime", videoId: "kitsu:9:2", alias: ("series", "tt9:1:2"))
+        #expect(found.map(\.url) == ["https://s.test/3.srt"])
+        #expect(subs.lastRequest?.url?.absoluteString == subs.url("/subtitles/series/tt9%3A1%3A2.json"))
+    }
+
+    @Test func twoAddonsWithOneSubtitleGiveItOneTime() async {
+        let one = StubServer()
+        let two = StubServer()
+        one.reply(subsManifest)
+        two.reply(subsManifest)
+        let repository = repository()
+        await repository.install(sources(one, two))
+        one.reply(#"{"subtitles":[{"url":"https://s.test/1.srt","lang":"eng"}]}"#)
+        two.reply(#"{"subtitles":[{"url":"https://s.test/1.srt","lang":"eng"},{"url":"https://s.test/2.srt","lang":"fre"}]}"#)
+        #expect(await repository.subtitles(type: "movie", videoId: "tt1").map(\.url) == ["https://s.test/1.srt", "https://s.test/2.srt"])
+    }
+
     @Test func onlyTheAddonsOfTheListAreInstalled() async {
         good.reply(goodManifest)
         let repository = repository()

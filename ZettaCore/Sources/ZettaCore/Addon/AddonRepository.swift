@@ -200,6 +200,61 @@ public actor AddonRepository {
         return all.filter { $0.isPlayable(withTorrents: withTorrents) }
     }
 
+    /// Asks each subtitle addon. When no installed addon gives subtitles for
+    /// this video, the app asks OpenSubtitles, which is free and needs no key.
+    /// Each addon gets `subtitleWait`. A slow addon does not hold back the
+    /// subtitles of the others.
+    ///
+    /// An addon that does not know the ID, such as a Kitsu ID, can know its IMDb
+    /// form. Give that form as `alias`.
+    public func subtitles(type: String, videoId: String, alias: (type: String, id: String)? = nil) async -> [Subtitle] {
+        let ids = [(type, videoId)] + (alias.map { [($0.type, $0.id)] } ?? [])
+        func asked(_ addons: [Addon]) -> [(Addon, (String, String))] {
+            addons.compactMap { addon in ids.first { addon.supports("subtitles", type: $0.0, id: $0.1) }.map { (addon, $0) } }
+        }
+        var requests = asked(state.addons)
+        if requests.isEmpty, let fallback = await fallbackAddon() { requests = asked([fallback]) }
+        let client = client
+        let wait = subtitleWait
+        let answers = await withTaskGroup(of: (Int, [Subtitle]).self) { group in
+            for (i, (addon, id)) in requests.enumerated() {
+                group.addTask {
+                    let found = await Self.withTimeLimit(wait) { try? await client.subtitles(addon, type: id.0, videoId: id.1) }
+                    return (i, found ?? [])
+                }
+            }
+            var all = [[Subtitle]](repeating: [], count: requests.count)
+            for await (i, found) in group { all[i] = found }
+            return all
+        }
+        var seen = Set<String>()
+        return answers.joined().filter { seen.insert($0.url).inserted }
+    }
+
+    private var fallback: Addon?
+
+    private func fallbackAddon() async -> Addon? {
+        guard let url = fallbackSubtitlesUrl else { return nil }
+        if let fallback { return fallback }
+        let installed = try? await client.install(url)
+        if fallback == nil { fallback = installed }
+        return fallback ?? installed
+    }
+
+    /// Gives the result of `work`, or nil when `limit` ends first. The work then stops.
+    static func withTimeLimit<T: Sendable>(_ limit: Duration, _ work: @escaping @Sendable () async -> T?) async -> T? {
+        await withTaskGroup(of: T?.self) { group in
+            group.addTask { await work() }
+            group.addTask {
+                try? await Task.sleep(for: limit)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+    }
+
     /// A text that tells why a request failed.
     static func message(_ error: Error) -> String {
         switch error {
