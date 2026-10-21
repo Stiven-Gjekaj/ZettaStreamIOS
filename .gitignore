@@ -1,0 +1,20 @@
+# Local secrets
+.env
+
+# Private notes that must not be public
+private/
+
+# Generated project. XcodeGen makes it from project.yml.
+*.xcodeproj/
+*.xcworkspace/
+
+# Build output
+build/
+DerivedData/
+.build/
+*.ipa
+*.xcframework/
+
+# Editors and the OS
+.vscode/
+.DS_Store
