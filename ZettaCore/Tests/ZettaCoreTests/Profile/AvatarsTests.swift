@@ -5,7 +5,10 @@ import Testing
 struct AvatarsTests {
     private let anilist = StubServer()
     private let tvmaze = StubServer()
-    private var avatars: Avatars { Avatars(session: anilist.session, anilistUrl: anilist.url("/"), tvmazeUrl: tvmaze.url("")) }
+    private let shikimori = StubServer()
+    private var avatars: Avatars {
+        Avatars(session: anilist.session, anilistUrl: anilist.url("/"), tvmazeUrl: tvmaze.url(""), shikimoriUrl: shikimori.url(""))
+    }
 
     private func data(_ text: String) -> Data { Data(text.utf8) }
 
@@ -94,5 +97,57 @@ struct AvatarsTests {
         #expect(Set(tvmaze.paths) == Set(Avatars.featuredShows.map { "/shows/\($0)/cast" }))
         let sent = try #require(body(anilist.lastRequest))
         #expect(sent["variables"] == nil)
+    }
+
+    private func role(_ name: String, _ id: Int, main: Bool = false, image: String? = nil) -> String {
+        let picture = image ?? "/system/characters/original/\(id).jpg?1"
+        return #"{"roles":["\#(main ? "Main" : "Supporting")"],"character":{"name":"\#(name)","image":{"original":"\#(picture)"}},"person":null}"#
+    }
+
+    @Test func shikimoriRolesPutTheMainCharactersFirstAndLeaveOutThePlaceholder() {
+        let text = "[" + [
+            role("Side", 1),
+            role("Hero", 2, main: true),
+            role("Nobody", 3, image: "/assets/globals/missing_original.jpg"),
+            #"{"roles":["Main"],"character":null,"person":{"name":"Voice"}}"#,
+        ].joined(separator: ",") + "]"
+        #expect(Avatars.Parse.shikimoriRoles(data(text), base: "https://s.test") == [
+            Avatar(name: "Hero", url: "https://s.test/system/characters/original/2.jpg?1"),
+            Avatar(name: "Side", url: "https://s.test/system/characters/original/1.jpg?1"),
+        ])
+        #expect(Avatars.Parse.shikimoriRoles(data("not json"), base: "https://s.test") == [])
+    }
+
+    @Test func whenAniListFailsTheFeaturedAnimeComeFromShikimori() async {
+        anilist.reply("disabled", status: 403)
+        for _ in Avatars.featuredShows { tvmaze.reply("[]") }
+        shikimori.reply(#"[{"id":10,"name":"A"},{"id":20,"name":"B"}]"#)
+        shikimori.reply("[" + (1...8).map { role("A\($0)", $0, main: $0 == 8) }.joined(separator: ",") + "]")
+        shikimori.reply("[" + role("B1", 1) + "," + role("B9", 9) + "]")
+        let groups = await avatars.featured()
+        let names = groups.first?.avatars.map(\.name) ?? []
+        #expect(groups.map(\.title) == ["Anime"])
+        // Each anime gives its first characters, main first. "B1" has the picture of "A1", so it is left out.
+        #expect(names == ["A8", "A1", "A2", "A3", "A4", "A5", "B9"])
+        #expect(shikimori.paths == ["/api/animes", "/api/animes/10/roles", "/api/animes/20/roles"])
+        #expect(shikimori.lastRequest?.value(forHTTPHeaderField: "User-Agent") == "ZettaStream")
+    }
+
+    @Test func whenAniListFailsASearchFindsNamesAndTheCastOfTheTitle() async {
+        anilist.reply("disabled", status: 403)
+        tvmaze.reply("[]")
+        shikimori.reply(#"[{"id":1,"name":"Frieren","image":{"original":"/system/characters/original/1.jpg?1"}}]"#)
+        shikimori.reply(#"[{"id":52991,"name":"Sousou no Frieren"}]"#)
+        shikimori.reply("[" + role("Fern", 2, main: true) + "," + role("Frieren", 1, main: true) + "]")
+        let names = await avatars.search("frieren").first?.avatars.map(\.name)
+        #expect(names == ["Frieren", "Fern"])
+        #expect(shikimori.paths == ["/api/characters/search", "/api/animes", "/api/animes/52991/roles"])
+    }
+
+    @Test func aWorkingAniListDoesNotAskShikimori() async {
+        anilist.reply(#"{"data":{"Page":{"characters":[{"name":{"full":"Frieren"},"image":{"large":"https://a.test/f.png"}}]}}}"#)
+        tvmaze.reply("[]")
+        #expect(await avatars.search("frieren").first?.avatars.count == 1)
+        #expect(shikimori.paths.isEmpty)
     }
 }
