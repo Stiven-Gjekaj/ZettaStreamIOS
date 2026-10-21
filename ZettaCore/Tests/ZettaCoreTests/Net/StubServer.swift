@@ -6,6 +6,9 @@ final class StubServer: Sendable {
     struct Reply {
         var status = 200
         var body: Data
+        var headers: [String: String] = [:]
+        /// The seconds before the answer comes. A test of a time limit uses it.
+        var delay: TimeInterval = 0
     }
 
     fileprivate static let lock = NSLock()
@@ -22,13 +25,14 @@ final class StubServer: Sendable {
 
     func url(_ path: String) -> String { "https://\(host)\(path)" }
 
-    func reply(_ body: String, status: Int = 200) {
-        reply(data: Data(body.utf8), status: status)
+    func reply(_ body: String, status: Int = 200, headers: [String: String] = [:], delay: TimeInterval = 0) {
+        reply(data: Data(body.utf8), status: status, headers: headers, delay: delay)
     }
 
     /// Answers with bytes, such as a gzip file.
-    func reply(data: Data, status: Int = 200) {
-        Self.lock.withLock { Self.replies[host, default: []].append(Reply(status: status, body: data)) }
+    func reply(data: Data, status: Int = 200, headers: [String: String] = [:], delay: TimeInterval = 0) {
+        let reply = Reply(status: status, body: data, headers: headers, delay: delay)
+        Self.lock.withLock { Self.replies[host, default: []].append(reply) }
     }
 
     /// The paths that the code asked for, in order.
@@ -42,6 +46,9 @@ final class StubServer: Sendable {
 
     /// The part that URLSession calls. It gives the next answer of the host.
     final class Loader: URLProtocol, @unchecked Sendable {
+        private let state = NSLock()
+        private var stopped = false
+
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
@@ -58,12 +65,24 @@ final class StubServer: Sendable {
                 client?.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost))
                 return
             }
-            let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: nil)!
+            if reply.delay > 0 {
+                DispatchQueue.global().asyncAfter(deadline: .now() + reply.delay) { self.answer(reply) }
+            } else {
+                answer(reply)
+            }
+        }
+
+        private func answer(_ reply: Reply) {
+            // A request that stopped, for example after a time limit, gets no answer.
+            guard !state.withLock({ stopped }) else { return }
+            let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: reply.headers)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: reply.body)
             client?.urlProtocolDidFinishLoading(self)
         }
 
-        override func stopLoading() {}
+        override func stopLoading() {
+            state.withLock { stopped = true }
+        }
     }
 }
