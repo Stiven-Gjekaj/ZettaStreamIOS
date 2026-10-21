@@ -33,6 +33,51 @@ public enum Display {
         return ("series", "\(imdb):\(season):\(episode)")
     }
 
+    /// The short facts under a card, such as "Movie · 2026". Empty when the addon gives no facts.
+    public static func cardFacts(type: String, releaseInfo: String?) -> String {
+        [kind(type), year(releaseInfo)].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private static let yearPattern = try! NSRegularExpression(pattern: #"\b(19|20)\d{2}\b"#)
+
+    /// The first year of a release text, such as 2019 for "2019-2023".
+    public static func year(_ releaseInfo: String?) -> String? {
+        guard let releaseInfo else { return nil }
+        let range = NSRange(releaseInfo.startIndex..., in: releaseInfo)
+        guard let match = yearPattern.firstMatch(in: releaseInfo, range: range),
+              let found = Range(match.range, in: releaseInfo) else { return nil }
+        return String(releaseInfo[found])
+    }
+
+    /// The rating of a card, such as "7.4". Nil when the addon gives no number above 0.
+    public static func rating(_ imdbRating: String?) -> String? {
+        guard let text = imdbRating?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let value = Double(text), value > 0, value <= 10 else { return nil }
+        return String(format: "%.1f", value)
+    }
+
+    /// The kind of a title in the singular, such as "Movie".
+    public static func kind(_ type: String) -> String? {
+        switch type.lowercased() {
+        case "movie": return "Movie"
+        case "series": return "Series"
+        case "anime": return "Anime"
+        case "tv", "channel": return "Channel"
+        case "": return nil
+        default: return type.prefix(1).uppercased() + type.dropFirst()
+        }
+    }
+
+    private static let metahubPoster = try! NSRegularExpression(pattern: #"^(https://images\.metahub\.space/poster/)(medium|large)(/.*)$"#)
+
+    /// The poster for a card. A card is about 300 pixels wide, so a large picture from
+    /// metahub becomes its small size (300 x 450), which is less than half the download.
+    public static func cardPoster(_ url: String?) -> String? {
+        guard let url else { return nil }
+        let range = NSRange(url.startIndex..., in: url)
+        return metahubPoster.stringByReplacingMatches(in: url, range: range, withTemplate: "$1small$3")
+    }
+
     public static func preview(_ m: MetaPreview) -> MetaPreview {
         var copy = m
         copy.name = englishName(m.name, aliases: m.aliases)

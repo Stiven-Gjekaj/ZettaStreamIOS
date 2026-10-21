@@ -41,4 +41,29 @@ struct DisplayTests {
         none.imdbId = nil
         #expect(Display.imdbAlias(none, videoId: "kitsu:7442:1", episodes: episodes) == nil)
     }
+
+    @Test func aCardShowsTheKindAndTheFirstYear() {
+        #expect(Display.cardFacts(type: "movie", releaseInfo: "2026") == "Movie · 2026")
+        #expect(Display.cardFacts(type: "series", releaseInfo: "2019–2023") == "Series · 2019")
+        #expect(Display.cardFacts(type: "anime", releaseInfo: "Oct 2024") == "Anime · 2024")
+        #expect(Display.cardFacts(type: "tv", releaseInfo: nil) == "Channel")
+        #expect(Display.cardFacts(type: "series", releaseInfo: "soon") == "Series")
+    }
+
+    @Test func aRatingHasOneDecimalAndOnlyAValidNumberShows() {
+        #expect(Display.rating("7.4") == "7.4")
+        #expect(Display.rating(" 8 ") == "8.0")
+        #expect(Display.rating("0") == nil)
+        #expect(Display.rating("N/A") == nil)
+        #expect(Display.rating("74") == nil)
+        #expect(Display.rating(nil) == nil)
+    }
+
+    @Test func aCardAsksForTheSmallMetahubPoster() {
+        #expect(Display.cardPoster("https://images.metahub.space/poster/medium/tt1/img") == "https://images.metahub.space/poster/small/tt1/img")
+        #expect(Display.cardPoster("https://images.metahub.space/poster/large/tt1/img") == "https://images.metahub.space/poster/small/tt1/img")
+        #expect(Display.cardPoster("https://images.metahub.space/poster/small/tt1/img") == "https://images.metahub.space/poster/small/tt1/img")
+        #expect(Display.cardPoster("https://media.kitsu.app/anime/1/poster.jpg") == "https://media.kitsu.app/anime/1/poster.jpg")
+        #expect(Display.cardPoster(nil) == nil)
+    }
 }
