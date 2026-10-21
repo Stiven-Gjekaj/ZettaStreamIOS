@@ -12,6 +12,14 @@ major number. See "Version numbers" in the decisions.
 A tag such as `v0.1.0` builds the unsigned IPA and attaches it to a release on
 GitHub as `ZettaStream.ipa`.
 
+## 0.1.2 (2026-10-21)
+
+- Finds the streams of a new anime that has only a MyAnimeList ID, such as
+  the new titles in the AnimeStream catalogs. The app gets the Kitsu ID of the
+  anime and asks the addons that read Kitsu IDs.
+- Shows the anime profile pictures again. AniList has disabled its API, so the
+  pictures come from Shikimori when AniList gives none.
+
 ## 0.1.1 (2026-10-21)
 
 - Fixes the install of a long source list. Only one addon worked, and the
