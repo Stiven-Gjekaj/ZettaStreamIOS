@@ -242,6 +242,29 @@ func TestPlayStopsWhenNoPeerSendsTheInformation(t *testing.T) {
 	}
 }
 
+func TestStopEndsAPlayThatWaitsForTheInformation(t *testing.T) {
+	startEngine(t, "")
+	done := make(chan error, 1)
+	go func() {
+		_, err := Play(testHash, -1, "", "")
+		done <- err
+	}()
+	// Wait until Play added the torrent.
+	deadline := time.Now().Add(5 * time.Second)
+	for len(eng.client.Torrents()) == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	Stop(testHash)
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("Play did not fail")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Play still waits after Stop")
+	}
+}
+
 func TestPlayRefusesATextThatIsNotAnInfoHash(t *testing.T) {
 	startEngine(t, "")
 	if _, err := Play("abc", -1, "", ""); err == nil {

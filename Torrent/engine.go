@@ -173,6 +173,9 @@ func Play(infoHash string, fileIdx int, trackers string, displayName string) (st
 	case <-time.After(metadataTimeout):
 		drop(hash, t)
 		return "", fmt.Errorf("no peer sent the torrent information in %d seconds", int(metadataTimeout/time.Second))
+	case <-t.Closed():
+		// Stop or StopAll dropped the torrent while Play waited.
+		return "", errors.New("the torrent stopped before its information came")
 	case <-cl.Closed():
 		return "", errors.New("the engine stopped")
 	}
