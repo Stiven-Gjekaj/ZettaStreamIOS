@@ -32,6 +32,18 @@ struct RootView: View {
                 .tag(tab)
             }
         }
+        .background(tabShortcuts)
+    }
+
+    /// Command and 1 to 5 open the tabs, as the keys 1 to 5 of the Android app do.
+    /// The number alone types into the search field, so the shortcut needs Command.
+    private var tabShortcuts: some View {
+        ForEach(Array(Tab.allCases.enumerated()), id: \.element) { index, tab in
+            Button(tab.title) { app.tab = tab }
+                .keyboardShortcut(KeyEquivalent(Character(String(index + 1))), modifiers: .command)
+                .opacity(0)
+                .accessibilityHidden(true)
+        }
     }
 
     @ViewBuilder
