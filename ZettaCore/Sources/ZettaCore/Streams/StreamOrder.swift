@@ -133,6 +133,31 @@ public enum StreamOrder {
         ].compactMap { $0 }.joined(separator: " · ")
     }
 
+    /// Selects the stream of the next episode from the same source. A stream in
+    /// the same binge group comes first, because the addon says that it is the
+    /// same source. Then the stream whose data is most like the current one:
+    /// resolution, codec, HDR, release group, and audio. A stream with the same
+    /// kind (direct or torrent) and the same name breaks a tie, then more seeders,
+    /// then the first in the list.
+    public static func pickSameSource(_ streams: [AddonStream], bingeGroup: String?, streamName: String?,
+                                      current: StreamInfo? = nil, wasTorrent: Bool? = nil) -> AddonStream? {
+        let inGroup = streams.filter { bingeGroup != nil && $0.hints.bingeGroup == bingeGroup }
+        let pool = inGroup.isEmpty ? streams : inGroup
+        func flag(_ value: Bool) -> Int { value ? 1 : 0 }
+        // Each stream gets a list of numbers. The largest list wins.
+        let keyed = pool.enumerated().map { index, s in
+            let info = StreamInfo(s)
+            return (s, [
+                current.map { StreamInfo.similarity($0, info) } ?? 0,
+                flag(wasTorrent != nil && s.isTorrent == wasTorrent),
+                flag(streamName != nil && s.name == streamName),
+                info.seeders ?? 0,
+                -index,
+            ])
+        }
+        return keyed.max { $0.1.lexicographicallyPrecedes($1.1) }?.0
+    }
+
     /// 0 for 1080p. Lower resolutions rank before higher ones. An unknown resolution ranks last.
     private static func resolutionRank(_ resolution: Int?) -> Int {
         guard let resolution else { return Int.max }
