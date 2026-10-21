@@ -1,0 +1,19 @@
+name: Services
+
+# Asks each outside service of the app with the code of the app, each day.
+# A change of a service, such as the end of an API, fails this workflow, and
+# GitHub sends a mail to the owner.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  services:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ask the outside services
+        env:
+          ZS_LIVE: "1"
+        run: swift test --package-path ZettaCore --filter LiveServiceTests
