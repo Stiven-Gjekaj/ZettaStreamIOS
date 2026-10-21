@@ -53,7 +53,8 @@ private struct ProfilesGrid: View {
                 .multilineTextAlignment(.center)
             ProfileFlowLayout(spacing: 20, rowSpacing: 24) {
                 ForEach(app.profiles.profiles) { profile in
-                    ProfileTile(label: profile.name, size: size, action: { choose(profile.id) }) {
+                    ProfileTile(label: profile.name, spoken: editing ? "Edit \(profile.name)" : profile.name, size: size,
+                                action: { choose(profile.id) }) {
                         ZStack {
                             ProfileCircle(name: profile.name, avatar: profile.avatar, size: size)
                             if editing {
@@ -63,7 +64,6 @@ private struct ProfilesGrid: View {
                                     .foregroundStyle(Palette.textPrimary)
                             }
                         }
-                        .accessibilityLabel(editing ? "Edit \(profile.name)" : profile.name)
                     }
                 }
                 if app.profiles.profiles.count < ProfileStore.maxProfiles {
@@ -98,6 +98,8 @@ private struct ProfilesGrid: View {
 /// A round button with a name under it.
 private struct ProfileTile<Picture: View>: View {
     let label: String
+    /// The text that VoiceOver says for the full tile, one time.
+    var spoken: String?
     let size: CGFloat
     let action: () -> Void
     @ViewBuilder let picture: () -> Picture
@@ -117,5 +119,8 @@ private struct ProfileTile<Picture: View>: View {
             .frame(width: size + 24)
         }
         .buttonStyle(SettingsPressStyle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken ?? label)
+        .accessibilityAddTraits(.isButton)
     }
 }

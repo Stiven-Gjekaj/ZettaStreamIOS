@@ -6,7 +6,7 @@ final class KeyboardTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launch()
-        let main = app.buttons["Main, Main"].firstMatch
+        let main = app.buttons["Main"].firstMatch
         if main.waitForExistence(timeout: 15) { main.tap() }
         XCTAssertTrue(app.tabBars.firstMatch.waitForExistence(timeout: 10), "The tabs do not show.")
 
