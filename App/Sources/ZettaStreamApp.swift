@@ -3,6 +3,7 @@ import ZettaCore
 
 @main
 struct ZettaStreamApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @StateObject private var app = AppModel()
 
     init() {
