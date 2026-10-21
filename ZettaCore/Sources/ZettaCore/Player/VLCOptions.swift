@@ -39,4 +39,39 @@ public enum VLCOptions {
         if let referrer, !referrer.isEmpty { out.options.append(":http-referrer=\(referrer)") }
         return out
     }
+
+    /// The text renderer options of VLC for the subtitle look of the viewer. VLC reads them when
+    /// the player starts, so a change starts the player again.
+    public static func subtitles(_ settings: ViewerSettings) -> [String] {
+        var options = [
+            "--sub-text-scale=\(Int((settings.subtitleSize.scale * 100).rounded()))",
+            "--freetype-color=\(settings.subtitleColor.argb & 0xFF_FFFF)",
+            "--freetype-opacity=255",
+            "--freetype-background-color=0",
+            "--freetype-background-opacity=\(settings.subtitleBackground.alpha)",
+            "--freetype-outline-color=0",
+            "--freetype-shadow-color=0",
+        ]
+        switch settings.subtitleEdge {
+        case .none:
+            options += ["--freetype-outline-thickness=0", "--freetype-shadow-opacity=0"]
+        case .outline:
+            options += ["--freetype-outline-thickness=4", "--freetype-shadow-opacity=0"]
+        case .shadow:
+            options += ["--freetype-outline-thickness=0", "--freetype-shadow-opacity=192",
+                        "--freetype-shadow-angle=-45", "--freetype-shadow-distance=0.06"]
+        case .raised:
+            // A thin edge and a short shadow up and to the left: the letters stand out of the picture.
+            options += ["--freetype-outline-thickness=2", "--freetype-shadow-opacity=255",
+                        "--freetype-shadow-angle=135", "--freetype-shadow-distance=0.03"]
+        }
+        switch settings.subtitleFont {
+        case .default: break
+        case .sans: options.append("--freetype-font=Helvetica")
+        case .serif: options.append("--freetype-font=Georgia")
+        case .mono: options.append("--freetype-font=Courier")
+        case .bold: options.append("--freetype-bold")
+        }
+        return options
+    }
 }
