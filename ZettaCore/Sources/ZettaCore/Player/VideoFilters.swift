@@ -4,7 +4,7 @@ import Foundation
 /// video and cost almost nothing. A colour change (`colour` is true) changes each pixel of
 /// each frame on the graphics chip, so it uses more power.
 /// The raw value is the name that the Android app saves.
-public enum VideoFilter: String, Hashable, Sendable, CaseIterable {
+public enum VideoFilter: String, Hashable, Sendable, CaseIterable, Codable {
     case none = "None"
     case crt = "Crt"
     case vhs = "Vhs"
