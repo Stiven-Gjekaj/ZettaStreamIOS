@@ -71,7 +71,7 @@ ZettaStream is not in the App Store.
 each update from it.
 
 ```
-https://raw.githubusercontent.com/Stiven-Gjekaj/sidestore-source/main/apps.json
+https://stiven-gjekaj.github.io/sidestore-source/apps.json
 ```
 
 **By hand:** each release has an unsigned `ZettaStream.ipa`. Sign and install
