@@ -43,6 +43,8 @@ final class PlayerController: ObservableObject {
     @Published private(set) var duration = 0
     @Published private(set) var playing = false
     @Published private(set) var buffering = true
+    /// The last time that VLC said the position changed.
+    private var lastTimeChange = Date.distantPast
     @Published private(set) var error: String?
     @Published private(set) var message: String?
     @Published private(set) var torrentText: String?
@@ -389,8 +391,17 @@ final class PlayerController: ObservableObject {
         }
         switch event {
         case .state(let state): stateChanged(state)
-        case .buffering(let progress): buffering = progress < 100 && player?.state != .paused
+        case .buffering(let progress):
+            // VLC also sends this while the video plays, as its cache fills. The
+            // wait shows only when the time stops for a second.
+            let stalled = Date().timeIntervalSince(lastTimeChange) > 1
+            buffering = !playerReady || (progress < 100 && player?.state != .paused && stalled)
         case .time:
+            // VLC also sends the time before the first frame. The wait stays until then.
+            if playerReady {
+                lastTimeChange = Date()
+                buffering = false
+            }
             updateTime()
             checkResume()
         case .length(let value):
