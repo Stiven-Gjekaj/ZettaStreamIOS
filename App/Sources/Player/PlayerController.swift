@@ -825,6 +825,24 @@ final class PlayerController: ObservableObject {
         audioSelected = kind
     }
 
+    /// Selects the next subtitle choice, and after the last one, no subtitles. A key of the keyboard does this.
+    func cycleSubtitle() {
+        guard !subtitleChoices.isEmpty else { return show("No subtitles") }
+        let index = subtitleChoices.firstIndex { $0.kind == subtitleSelected } ?? -1
+        let next = subtitleChoices[(index + 1) % subtitleChoices.count]
+        selectSubtitle(next.kind)
+        show("Subtitles: \(next.label)")
+    }
+
+    /// Selects the next audio track.
+    func cycleAudio() {
+        guard audioChoices.count > 1 else { return show("One audio track") }
+        let index = audioChoices.firstIndex { $0.kind == audioSelected } ?? -1
+        let next = audioChoices[(index + 1) % audioChoices.count]
+        selectAudio(next.kind)
+        show("Audio: \(next.label)")
+    }
+
     func shiftSubtitleDelay(_ direction: Int) {
         subtitleDelayMs = Timing.step(subtitleDelayMs, direction: direction, step: Timing.subtitleStep, limit: Timing.subtitleLimit)
         player?.currentVideoSubTitleDelay = subtitleDelayMs * 1000

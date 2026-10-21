@@ -8,6 +8,8 @@ struct PlayerScreen: View {
     @EnvironmentObject private var app: AppModel
     @StateObject private var controller: PlayerController
     @State private var optionsOpen = false
+    @State private var inputs = PlayerInputs()
+    @State private var keys: PlayerKeyActions?
 
     init(playback: Playback) {
         self.playback = playback
@@ -33,8 +35,15 @@ struct PlayerScreen: View {
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         .zettaScreen()
-        .onAppear { controller.start(app: app) }
-        .onDisappear { controller.close() }
+        .onAppear {
+            controller.start(app: app)
+            startKeys()
+        }
+        .onDisappear {
+            inputs.stop()
+            keys?.stop()
+            controller.close()
+        }
     }
 
     @ViewBuilder
@@ -111,6 +120,19 @@ struct PlayerScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .padding(24)
             .allowsHitTesting(false)
+    }
+
+    /// A keyboard and a game controller work as the remote control of the Android app.
+    private func startKeys() {
+        let actions = PlayerKeyActions(
+            controller: controller,
+            optionsOpen: { optionsOpen },
+            setOptions: { open in
+                if open { openOptions() } else { withAnimation(.easeOut(duration: 0.2)) { optionsOpen = false } }
+            },
+            close: close)
+        keys = actions
+        inputs.start { key, pressed in actions.handle(key, pressed: pressed) }
     }
 
     private func openOptions() {
