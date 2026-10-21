@@ -20,6 +20,7 @@ final class AppModel: ObservableObject {
     @Published var paths: [Tab: NavigationPath] = [:]
     @Published var playback: Playback?
     @Published var toast: String?
+    private let network = NetworkWatch()
     @Published var homeFilter: String?
 
     private var tasks: [Task<Void, Never>] = []
@@ -50,6 +51,13 @@ final class AppModel: ObservableObject {
         tasks.append(Task { [weak self] in
             for await value in await c.addons.states() { self?.addonState = value }
         })
+        network.start { [weak self] in self?.retryFailed() }
+    }
+
+    /// The addons and the playlists that did not answer try again.
+    private func retryFailed() {
+        if !addonState.loading && !addonState.failures.isEmpty { homeRetryAddons() }
+        if live.loaded && !live.loading && !live.failures.isEmpty { reloadLive() }
     }
 
     var currentProfile: Profile? {
