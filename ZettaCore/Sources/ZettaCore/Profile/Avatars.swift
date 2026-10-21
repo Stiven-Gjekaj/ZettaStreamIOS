@@ -46,7 +46,10 @@ public struct Avatars: Sendable {
         async let anime = anilist(nil)
         let tv = await withTaskGroup(of: (Int, [Avatar]).self) { group in
             for (index, id) in Self.featuredShows.enumerated() {
-                group.addTask { (index, await Parse.tvmazeCast(get("\(tvmazeUrl)/shows/\(id)/cast"))) }
+                group.addTask {
+                    let position = index
+                    return (position, await Parse.tvmazeCast(get("\(tvmazeUrl)/shows/\(id)/cast")))
+                }
             }
             var casts: [(Int, [Avatar])] = []
             for await cast in group { casts.append(cast) }

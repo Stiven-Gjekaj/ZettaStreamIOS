@@ -112,7 +112,13 @@ public actor AddonRepository {
         let results = await withTaskGroup(of: (Int, Result<Addon, Error>).self) { group in
             for (i, url) in urls.enumerated() {
                 group.addTask {
-                    do { return (i, .success(try await client.install(url))) } catch { return (i, .failure(error)) }
+                    // The index goes into a constant before the first await. The Swift 6.4
+                    // optimizer gave each task the index 0 when it read the loop value after
+                    // the await. See docs/decisions.md, "Release builds and task groups".
+                    let index = i
+                    let result: Result<Addon, Error>
+                    do { result = .success(try await client.install(url)) } catch { result = .failure(error) }
+                    return (index, result)
                 }
             }
             var all = [Result<Addon, Error>?](repeating: nil, count: urls.count)
@@ -199,8 +205,9 @@ public actor AddonRepository {
                 await withTaskGroup(of: Void.self) { group in
                     for (i, (addon, catalog)) in catalogs.enumerated() {
                         group.addTask {
+                            let index = i
                             let metas = (try? await client.catalog(addon, catalog, extras: [("search", query)])) ?? []
-                            answers.set(i, metas)
+                            answers.set(index, metas)
                             changed.yield()
                         }
                     }
@@ -321,8 +328,9 @@ public actor AddonRepository {
         let answers = await withTaskGroup(of: (Int, [Subtitle]).self) { group in
             for (i, (addon, id)) in requests.enumerated() {
                 group.addTask {
+                    let index = i
                     let found = await Self.withTimeLimit(wait) { try? await client.subtitles(addon, type: id.0, videoId: id.1) }
-                    return (i, found ?? [])
+                    return (index, found ?? [])
                 }
             }
             var all = [[Subtitle]](repeating: [], count: requests.count)

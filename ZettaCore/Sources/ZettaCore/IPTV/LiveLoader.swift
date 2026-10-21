@@ -72,7 +72,11 @@ public struct LiveLoader: Sendable {
         await withTaskGroup(of: (Int, Result<T, any Error>).self) { group in
             for (index, url) in urls.enumerated() {
                 group.addTask {
-                    do { return (index, .success(try await work(url))) } catch { return (index, .failure(error)) }
+                    // The index goes into a constant before the first await. See AddonRepository.install.
+                    let position = index
+                    let result: Result<T, any Error>
+                    do { result = .success(try await work(url)) } catch { result = .failure(error) }
+                    return (position, result)
                 }
             }
             var results = [Result<T, any Error>?](repeating: nil, count: urls.count)

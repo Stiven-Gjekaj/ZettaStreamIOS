@@ -335,7 +335,10 @@ private enum HomeNewEpisodeCache {
         if wanted != key || time.map({ Date().timeIntervalSince($0) > keep }) ?? true {
             let answers = await withTaskGroup(of: (Int, Meta).self) { group in
                 for (index, show) in shows.enumerated() {
-                    group.addTask { (index, await addons.meta(show)) }
+                    group.addTask {
+                        let position = index
+                        return (position, await addons.meta(show))
+                    }
                 }
                 var all: [(Int, Meta)] = []
                 for await answer in group { all.append(answer) }
