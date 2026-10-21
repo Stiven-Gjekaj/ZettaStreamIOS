@@ -45,3 +45,24 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: "NO"
         INFOPLIST_FILE: App/Info.plist
+  ZettaStreamUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - UITests
+    dependencies:
+      - target: ZettaStream
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.stivengjekaj.zettastream.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: ZettaStream
+schemes:
+  ZettaStream:
+    build:
+      targets:
+        ZettaStream: all
+        ZettaStreamUITests: [test]
+    test:
+      targets:
+        - ZettaStreamUITests

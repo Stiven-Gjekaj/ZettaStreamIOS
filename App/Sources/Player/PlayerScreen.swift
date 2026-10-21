@@ -28,6 +28,8 @@ struct PlayerScreen: View {
             // The small window shows only the video.
             if !controller.pictureInPictureActive { layers }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("player")
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         .zettaScreen()

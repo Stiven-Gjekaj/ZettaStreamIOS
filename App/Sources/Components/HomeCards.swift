@@ -206,6 +206,8 @@ struct HomePosterRow: View {
                     }
                     .buttonStyle(HomeCardButtonStyle())
                     .homeCardMenu(meta)
+                    // The end-to-end test finds a card with this name.
+                    .accessibilityIdentifier("card:\(meta.id)")
                 }
                 if let onMore {
                     Button(action: onMore) {
