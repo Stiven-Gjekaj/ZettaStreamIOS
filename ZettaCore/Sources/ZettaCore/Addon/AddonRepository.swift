@@ -14,6 +14,25 @@ public struct AddonState: Hashable, Sendable {
     }
 }
 
+/// The streams of one addon, or the reason that it gave none.
+public struct StreamGroup: Hashable, Sendable {
+    public let addon: Addon
+    public var streams: [AddonStream]
+    /// Torrent streams that the app hides because the viewer turned torrents off.
+    public var hiddenTorrents: Int
+    /// Links that no part of the app can play, such as a YouTube ID or a link to another app.
+    public var unplayable: Int
+    public var error: String?
+
+    public init(addon: Addon, streams: [AddonStream] = [], hiddenTorrents: Int = 0, unplayable: Int = 0, error: String? = nil) {
+        self.addon = addon
+        self.streams = streams
+        self.hiddenTorrents = hiddenTorrents
+        self.unplayable = unplayable
+        self.error = error
+    }
+}
+
 /// Installs the addons in the source list and sends requests to all of them.
 /// All addons get each request at the same time.
 public actor AddonRepository {
@@ -30,6 +49,10 @@ public actor AddonRepository {
     private var sources: [Source] = []
     /// Goes up with each install. An install that a newer one replaced does not set the state.
     private var generation = 0
+    private var streamCache: [String: (Date, [StreamGroup])] = [:]
+
+    /// How long a list of streams stays in memory: 15 minutes.
+    public static let streamKeep: TimeInterval = 15 * 60
 
     /// - Parameters:
     ///   - fallbackSubtitlesUrl: The addon that gives subtitles when no installed addon does.
@@ -125,6 +148,56 @@ public actor AddonRepository {
         return keys.enumerated()
             .sorted { (order.firstIndex(of: $0.element) ?? 99, $0.offset) < (order.firstIndex(of: $1.element) ?? 99, $1.offset) }
             .map(\.element)
+    }
+
+    /// The last full list of streams for a video, so that Back from the player shows
+    /// the same list at once. A stream link can expire, so the list is kept for
+    /// `streamKeep` only.
+    public func cachedStreams(type: String, videoId: String, withTorrents: Bool) -> [StreamGroup]? {
+        guard let (time, groups) = streamCache["\(type)|\(videoId)|\(withTorrents)"],
+              clock().timeIntervalSince(time) < Self.streamKeep else { return nil }
+        return groups
+    }
+
+    public func keepStreams(type: String, videoId: String, withTorrents: Bool, groups: [StreamGroup]) {
+        streamCache["\(type)|\(videoId)|\(withTorrents)"] = (clock(), groups)
+    }
+
+    /// Asks each addon for streams. Each group comes when its addon answers, and the
+    /// stream ends after the last addon. Torrent streams come too when `withTorrents` is true.
+    public func streams(type: String, videoId: String, withTorrents: Bool = false) -> AsyncStream<StreamGroup> {
+        let addons = state.addons.filter { $0.supports("stream", type: type, id: videoId) }
+        let client = client
+        return AsyncStream { continuation in
+            let task = Task {
+                await withTaskGroup(of: Void.self) { group in
+                    for addon in addons {
+                        group.addTask {
+                            let found: StreamGroup
+                            do {
+                                let all = try await client.streams(addon, type: type, videoId: videoId)
+                                let playable = all.filter { $0.isPlayable(withTorrents: withTorrents) }
+                                let hidden = withTorrents ? 0 : all.filter(\.isTorrent).count
+                                found = StreamGroup(addon: addon, streams: playable, hiddenTorrents: hidden,
+                                                    unplayable: all.count - playable.count - hidden)
+                            } catch {
+                                found = StreamGroup(addon: addon, error: Self.message(error))
+                            }
+                            continuation.yield(found)
+                        }
+                    }
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    /// Asks one addon for the playable streams of a video. Nil when the addon is not installed.
+    public func streamsFrom(addonUrl: String, type: String, videoId: String, withTorrents: Bool = false) async -> [AddonStream]? {
+        guard let addon = state.addons.first(where: { $0.manifestUrl == addonUrl }) else { return nil }
+        let all = (try? await client.streams(addon, type: type, videoId: videoId)) ?? []
+        return all.filter { $0.isPlayable(withTorrents: withTorrents) }
     }
 
     /// A text that tells why a request failed.
