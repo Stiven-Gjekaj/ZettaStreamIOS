@@ -7,7 +7,8 @@ enum PlayerEvent: Sendable {
     case state(VLCMediaPlayerState)
     case buffering(Float)
     case time
-    case length
+    /// The length in milliseconds. `VLCMedia.length` can stay 0 for an HLS stream, so the length comes from here.
+    case length(Int64)
     case trackAdded(id: String, isText: Bool)
     case tracksChanged
     case snapshot
@@ -33,7 +34,7 @@ final class PlayerEventBridge: NSObject, VLCMediaPlayerDelegate, @unchecked Send
     func mediaPlayerTimeChanged(_ aNotification: Notification) { send(.time) }
 
     @objc(mediaPlayerLengthChanged:)
-    func mediaPlayerLengthChanged(_ length: Int64) { send(.length) }
+    func mediaPlayerLengthChanged(_ length: Int64) { send(.length(length)) }
 
     @objc(mediaPlayerSnapshot:)
     func mediaPlayerSnapshot(_ aNotification: Notification) { send(.snapshot) }
@@ -86,12 +87,19 @@ final class PictureInPictureMedia: NSObject, VLCPictureInPictureMediaControlling
     private weak var current: VLCMediaPlayer?
     /// A live channel has no length, so the window shows no seek bar.
     private var live = false
+    /// The length that the player events gave. `VLCMedia.length` can stay 0 for HLS.
+    private var length: Int64 = 0
 
     func attach(_ player: VLCMediaPlayer?, live: Bool) {
         lock.withLock {
             current = player
             self.live = live
+            length = 0
         }
+    }
+
+    func update(length: Int64) {
+        lock.withLock { self.length = length }
     }
 
     private var player: VLCMediaPlayer? { lock.withLock { current } }
@@ -105,8 +113,9 @@ final class PictureInPictureMedia: NSObject, VLCPictureInPictureMediaControlling
     }
 
     func mediaLength() -> Int64 {
-        if lock.withLock({ live }) { return 0 }
-        return Int64(player?.media?.length.intValue ?? 0)
+        let (live, known) = lock.withLock { (self.live, length) }
+        if live { return 0 }
+        return max(known, Int64(player?.media?.length.intValue ?? 0))
     }
 
     func mediaTime() -> Int64 { Int64(player?.time.intValue ?? 0) }

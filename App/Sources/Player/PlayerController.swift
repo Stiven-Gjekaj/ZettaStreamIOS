@@ -90,6 +90,8 @@ final class PlayerController: ObservableObject {
     /// True after the current VLC player stopped or failed.
     private var playerEnded = false
     private var pauseWhenReady = false
+    /// The length that the current player gave.
+    private var length = 0
     private var retries = 0
     /// The furthest position where the stream stopped with a fault.
     private var faultAt = 0
@@ -283,6 +285,7 @@ final class PlayerController: ObservableObject {
         self.bridge = bridge
         playerReady = false
         playerEnded = false
+        length = 0
         slaveTracks = [:]
         pendingSlaves = []
         applyFilter()
@@ -382,7 +385,12 @@ final class PlayerController: ObservableObject {
         switch event {
         case .state(let state): stateChanged(state)
         case .buffering(let progress): buffering = progress < 100 && player?.state != .paused
-        case .time, .length:
+        case .time:
+            updateTime()
+            checkResume()
+        case .length(let value):
+            length = max(Int(value), 0)
+            surface.media.update(length: Int64(length))
             updateTime()
             checkResume()
         case .trackAdded(let id, let isText):
@@ -424,8 +432,8 @@ final class PlayerController: ObservableObject {
 
     private func updateTime() {
         guard let player, player.state != .stopped else { return }
+        duration = max(length, Int(player.media?.length.intValue ?? 0))
         position = max(Int(player.time.intValue), 0)
-        duration = max(Int(player.media?.length.intValue ?? 0), 0)
         checkReady()
         positionChanged()
     }
@@ -577,9 +585,9 @@ final class PlayerController: ObservableObject {
         if duration > 0 && !skipTimesAsked {
             skipTimesAsked = true
             let id = video.videoId
-            let length = duration
+            let known = duration
             Task { [weak self] in
-                let found = await app.container.skipTimes.forVideo(id, durationMs: length)
+                let found = await app.container.skipTimes.forVideo(id, durationMs: known)
                 if self?.video?.videoId == id { self?.skips = found }
             }
         }
