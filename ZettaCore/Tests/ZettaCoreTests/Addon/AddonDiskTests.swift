@@ -2,9 +2,14 @@ import Foundation
 import Testing
 @testable import ZettaCore
 
-struct AddonDiskTests {
+/// A class, so that `deinit` removes the folder of each test.
+final class AddonDiskTests: Sendable {
     private let server = StubServer()
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("addons-\(UUID().uuidString)")
+
+    deinit {
+        try? FileManager.default.removeItem(at: folder)
+    }
     private let manifest = #"{"id":"g","name":"Good","types":["movie"],"resources":["stream","catalog"],"catalogs":[{"type":"movie","id":"top"}]}"#
 
     private func repository() -> AddonRepository {

@@ -2,9 +2,14 @@ import Foundation
 import Testing
 @testable import ZettaCore
 
-struct FileClientTests {
+/// A class, so that `deinit` removes the folder of each test.
+final class FileClientTests: Sendable {
     private let server = StubServer()
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("files-\(UUID().uuidString)")
+
+    deinit {
+        try? FileManager.default.removeItem(at: folder)
+    }
     private var client: FileClient { FileClient(session: server.session, userAgent: "ZettaStream/test", folder: folder) }
 
     private func client(at time: TimeInterval) -> FileClient {

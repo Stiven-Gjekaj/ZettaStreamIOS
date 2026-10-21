@@ -3,12 +3,17 @@ import Testing
 @testable import ZettaCore
 
 // The Android app has no test for this code. These tests hold the behaviour of LiveRepository.load.
-struct LiveLoaderTests {
+/// A class, so that `deinit` removes the folder of each test.
+final class LiveLoaderTests: Sendable {
     // 2026-10-08T10:30:00Z in milliseconds.
     private let now: Int64 = 1_791_455_400_000
 
     /// The session of one stub server also answers for the hosts of the others.
     private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("live-\(UUID().uuidString)")
+
+    deinit {
+        try? FileManager.default.removeItem(at: folder)
+    }
 
     private func loader(_ server: StubServer, at time: TimeInterval = 0) -> LiveLoader {
         LiveLoader(client: FileClient(session: server.session, userAgent: "ZettaStream/test", folder: folder,
