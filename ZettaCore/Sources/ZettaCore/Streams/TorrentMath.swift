@@ -14,6 +14,13 @@ public enum TorrentMath {
 
     private static let videoExtensions: Set = ["mkv", "mp4", "m4v", "avi", "webm", "mov", "ts", "m2ts", "wmv", "flv", "mpg", "mpeg"]
 
+    /// The line that the player shows while a torrent loads, such as
+    /// "Torrent: 12 peers, 1.4 MB/s, 180 MB of 1.5 GB". The speed is in bytes per second.
+    public static func status(peers: Int, downloadRate: Int64, fileDone: Int64, fileSize: Int64) -> String {
+        let speed = String(format: "%.1f", Double(downloadRate) / 1_000_000)
+        return "Torrent: \(peers) peers, \(speed) MB/s, \(StreamInfo.formatSize(fileDone)) of \(StreamInfo.formatSize(fileSize))"
+    }
+
     public static func isInfoHash(_ text: String?) -> Bool {
         guard let text, text.unicodeScalars.count == 40 else { return false }
         return text.unicodeScalars.allSatisfy { CharacterSet.decimalDigits.contains($0) || "abcdefABCDEF".unicodeScalars.contains($0) }

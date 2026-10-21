@@ -56,6 +56,14 @@ public enum Episodes {
         return "S\(season) E\(episode)"
     }
 
+    /// The episode `step` places after `videoId` in `episodes`, such as 1 for the next episode
+    /// and -1 for the previous one. Nil when `videoId` is not in the list or the list ends.
+    public static func neighbour(_ episodes: [Video], of videoId: String, step: Int) -> Video? {
+        guard let index = episodes.firstIndex(where: { $0.id == videoId }) else { return nil }
+        let target = index + step
+        return episodes.indices.contains(target) ? episodes[target] : nil
+    }
+
     /// True when the saved position resumes: the video started and did not end.
     public static func resumes(_ progress: WatchProgress?) -> Bool {
         guard let progress else { return false }

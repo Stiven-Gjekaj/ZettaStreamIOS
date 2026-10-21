@@ -122,4 +122,10 @@ struct TorrentMathTests {
         #expect(TorrentMath.mimeType("noext") == "application/octet-stream")
         #expect(!TorrentMath.isVideo("mkv"))
     }
+
+    @Test func theStatusShowsThePeersTheSpeedAndTheFile() {
+        #expect(TorrentMath.status(peers: 12, downloadRate: 1_440_000, fileDone: 180_000_000, fileSize: 1_500_000_000)
+            == "Torrent: 12 peers, 1.4 MB/s, 180 MB of 1.5 GB")
+        #expect(TorrentMath.status(peers: 0, downloadRate: 0, fileDone: 0, fileSize: 0) == "Torrent: 0 peers, 0.0 MB/s, 0 MB of 0 MB")
+    }
 }

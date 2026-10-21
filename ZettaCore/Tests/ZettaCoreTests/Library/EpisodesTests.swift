@@ -57,4 +57,14 @@ struct EpisodesTests {
         #expect(Episodes.seasonName(0) == "Specials")
         #expect(Episodes.seasonName(3) == "Season 3")
     }
+
+    @Test func theNeighbourFollowsTheOrderOfTheList() {
+        let list = [Video(id: "a"), Video(id: "b"), Video(id: "c")]
+        #expect(Episodes.neighbour(list, of: "b", step: 1)?.id == "c")
+        #expect(Episodes.neighbour(list, of: "b", step: -1)?.id == "a")
+        #expect(Episodes.neighbour(list, of: "c", step: 1) == nil)
+        #expect(Episodes.neighbour(list, of: "a", step: -1) == nil)
+        #expect(Episodes.neighbour(list, of: "x", step: 1) == nil)
+        #expect(Episodes.neighbour([], of: "a", step: 1) == nil)
+    }
 }
