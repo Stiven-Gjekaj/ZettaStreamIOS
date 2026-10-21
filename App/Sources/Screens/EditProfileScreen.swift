@@ -183,6 +183,7 @@ private struct ProfileAvatarRow: View {
                     ForEach(group.avatars, id: \.url) { choice in
                         Button { choose(choice.url) } label: { tile(choice) }
                             .buttonStyle(SettingsPressStyle())
+                            .accessibilityIdentifier("avatar")
                     }
                 }
                 .padding(.horizontal, settingsGutter)

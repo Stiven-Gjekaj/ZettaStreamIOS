@@ -47,6 +47,7 @@ struct LiveScreen: View {
                             }
                         }
                         .contextMenu { favoriteButton(channel, key: key, favorite: favorites.contains(key)) }
+                        .accessibilityIdentifier("channel:\(channel.name)")
                     }
                 }
                 .padding(.vertical, 16)

@@ -127,6 +127,7 @@ struct SearchScreen: View {
                                 PosterCard(meta: meta, width: 112)
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("card:\(meta.id)")
                         }
                     }
                     .padding(.horizontal, libraryGutter)
