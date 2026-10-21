@@ -12,6 +12,26 @@ major number. See "Version numbers" in the decisions.
 A tag such as `v0.1.0` builds the unsigned IPA and attaches it to a release on
 GitHub as `ZettaStream.ipa`.
 
+## 1.0.0 (2026-10-21)
+
+- Starts faster. The addons and the rows of Home come from the disk at once,
+  and then the addons refresh them.
+- Works with no network: an addon that does not answer uses its manifest from
+  the disk, and Home shows its last rows.
+- Tries the failed addons and playlists again when the network comes back.
+- An HLS stream gets more tries, and a lower quality for one minute after
+  faults, as on Android.
+- A torrent that shows no picture in 120 seconds gives its place to the next
+  stream.
+- A torrent stops when the device is almost full, and its data goes.
+- The anime pictures of a profile come in about 6 seconds, not 33.
+- The text follows Dynamic Type, and VoiceOver says the name of a profile one
+  time.
+- The keys of a keyboard work in the player also after a tap on the video.
+- The text for torrent peers does not cover the buttons of the player.
+- The IPA is 1.6 MB smaller, and the installed app 9.7 MB smaller.
+- The backup works in both directions with the Android app 1.5.1.
+
 ## 0.1.3 (2026-10-21)
 
 - Adds voice search. The microphone button in the search field listens for a
