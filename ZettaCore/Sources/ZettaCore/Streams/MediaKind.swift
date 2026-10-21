@@ -33,4 +33,35 @@ public enum MediaKind: String, Hashable, Sendable, Codable {
         if type.hasPrefix("video/") || type.hasPrefix("audio/") || type.contains("octet-stream") { return .file }
         return nil
     }
+
+    /// The number of bytes that `detect` reads from the server.
+    static let probeBytes = 1024
+
+    /// Finds the kind from the link, or else asks the server for the first bytes.
+    /// When neither tells, the player reads the link as a file.
+    public static func detect(session: URLSession = .shared, url: String, headers: [String: String] = [:]) async -> MediaKind {
+        if let kind = from(url: url) { return kind }
+        return await probe(session: session, url: url, headers: headers) ?? .file
+    }
+
+    private static func probe(session: URLSession, url: String, headers: [String: String]) async -> MediaKind? {
+        guard let link = URL(string: url) else { return nil }
+        var request = URLRequest(url: link)
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
+        request.setValue("bytes=0-\(probeBytes - 1)", forHTTPHeaderField: "Range")
+        do {
+            let (bytes, response) = try await session.bytes(for: request)
+            // A server can send the full file. Read only the start, then stop the download.
+            defer { bytes.task.cancel() }
+            var start = Data()
+            for try await byte in bytes {
+                start.append(byte)
+                if start.count >= probeBytes { break }
+            }
+            let type = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Type")
+            return from(contentType: type, start: start)
+        } catch {
+            return nil
+        }
+    }
 }
