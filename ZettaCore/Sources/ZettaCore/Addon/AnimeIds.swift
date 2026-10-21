@@ -30,17 +30,23 @@ public enum AnimeIds {
 }
 
 /// Finds the Kitsu number of a MyAnimeList number, and keeps each answer in memory.
+/// With a file, each number that it finds also stays on the disk for the next start.
 public actor KitsuMapper {
     public static let api = "https://kitsu.io/api/edge"
 
     private let session: URLSession
     private let base: String
     private var known: [Int: Int?] = [:]
+    private let saved: JSONFile<[String: Int]>?
 
     /// A test gives its own address for Kitsu.
-    public init(session: URLSession = .shared, base: String = KitsuMapper.api) {
+    public init(session: URLSession = .shared, base: String = KitsuMapper.api, file: URL? = nil) {
         self.session = session
         self.base = base
+        saved = file.map { JSONFile(file: $0) { [:] } }
+        for (mal, kitsu) in saved?.value ?? [:] {
+            if let mal = Int(mal) { known[mal] = kitsu }
+        }
     }
 
     /// The Kitsu number, or nil when Kitsu does not know the anime or does not answer.
@@ -55,6 +61,8 @@ public actor KitsuMapper {
               (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
         let found = AnimeIds.kitsuId(mappingAnswer: data)
         known[mal] = found
+        // A number that Kitsu does not know is asked again at the next start, because Kitsu can add it.
+        if let found { try? saved?.update { $0[String(mal)] = found } }
         return found
     }
 }

@@ -36,6 +36,23 @@ struct AnimeIdsTests {
         #expect(query.contains("myanimelist%2Fanime"))
     }
 
+    @Test func aFoundNumberIsOnTheDiskAtTheNextStart() async {
+        let kitsu = StubServer()
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("kitsu-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: file) }
+        kitsu.reply(mapping)
+        kitsu.reply(#"{"data":[],"included":[]}"#)
+        let first = KitsuMapper(session: kitsu.session, base: kitsu.url("/api/edge"), file: file)
+        #expect(await first.kitsuId(mal: 61987) == 50021)
+        #expect(await first.kitsuId(mal: 2) == nil)
+        let next = KitsuMapper(session: kitsu.session, base: kitsu.url("/api/edge"), file: file)
+        #expect(await next.kitsuId(mal: 61987) == 50021)
+        #expect(kitsu.paths.count == 2)
+        // The number that Kitsu did not know is asked again. The stub has no answer now.
+        #expect(await next.kitsuId(mal: 2) == nil)
+        #expect(kitsu.paths.count == 3)
+    }
+
     @Test func aMappingWithNoAnimeGivesNil() async {
         let kitsu = StubServer()
         kitsu.reply(#"{"data":[],"included":[]}"#)
