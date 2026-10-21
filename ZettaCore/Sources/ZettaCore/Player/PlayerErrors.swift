@@ -39,6 +39,25 @@ public enum PlayerErrors {
         isTorrent ? nil : 45_000
     }
 
+    /// An HLS stream gets more tries, as each part of it does on Android.
+    public static let hlsMaxRetries = 6
+
+    /// The heights that an HLS stream steps down through after faults.
+    public static let hlsHeights = [2160, 1440, 1080, 720, 480, 360]
+
+    /// The time that a lower quality stays after faults, as on Android.
+    public static let lowerQualityMs = 60_000
+
+    /// The largest height for the reconnect of an HLS stream. After two faults in a row, the
+    /// reconnect takes the next lower quality, as the Android app takes a part from a lower
+    /// quality. Nil keeps the quality. `playing` is the height that played, or 0 when unknown.
+    public static func hlsHeightLimit(retries: Int, playing: Int, limit: Int?) -> Int? {
+        guard retries >= 2 else { return limit }
+        let from = min(limit ?? Int.max, playing > 0 ? playing : Int.max)
+        guard from != Int.max else { return 720 }
+        return hlsHeights.first { $0 < from } ?? hlsHeights.last
+    }
+
     /// Good playback this far past a fault ends the count of tries.
     public static let recoveredMs = 30_000
 
@@ -59,11 +78,12 @@ public enum PlayerErrors {
     /// Damaged data stops it again at the same place, so the second try jumps `skipMs` ahead.
     /// Then the next source continues at the same position. A device that cannot decode the
     /// video does not change with a new try, so it goes to the next source at once.
-    public static func midStream(_ fault: PlaybackFault, retries: Int, hasNextSource: Bool) -> MidStream {
+    /// An HLS stream gets `hlsMaxRetries` tries.
+    public static func midStream(_ fault: PlaybackFault, retries: Int, hasNextSource: Bool, isHls: Bool = false) -> MidStream {
         let decoder = fault == .decoder
         if !decoder && retries == 0 { return .reconnect }
         if !decoder && retries == 1 && fault == .notVideo { return .skipAhead }
-        if !decoder && retries < maxRetries && fault.isNetwork { return .reconnect }
+        if !decoder && retries < (isHls ? hlsMaxRetries : maxRetries) && fault.isNetwork { return .reconnect }
         return hasNextSource ? .nextSource : .stop
     }
 

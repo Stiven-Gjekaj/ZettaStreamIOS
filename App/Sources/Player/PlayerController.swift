@@ -105,6 +105,9 @@ final class PlayerController: ObservableObject {
     private var skipTimesAsked = false
     private var autoSkipped = Set<Int>()
     private var countdownEnds: Date?
+    /// The largest height of an HLS stream after faults, and the position where it started.
+    private var hlsHeightLimit: Int?
+    private var lowerQualitySince = 0
     private var countdownCancelled = false
     /// The next episode, found in the last minutes of this one: its video ID, and its playback or nil.
     private var preparedNext: (id: String, playback: VideoPlayback?)?
@@ -259,6 +262,8 @@ final class PlayerController: ObservableObject {
         media.addOption(":network-caching=\(buffer.networkCachingMs)")
         // A dropped connection reconnects inside VLC before the player sees a fault.
         media.addOption(":http-reconnect")
+        // After faults, an HLS stream takes a lower quality. See PlayerErrors.hlsHeightLimit.
+        if let limit = hlsHeightLimit { media.addOption(":adaptive-maxheight=\(limit)") }
         let request = VLCOptions.headers(headers)
         request.options.forEach(media.addOption)
         if let host = url.host {
@@ -365,6 +370,7 @@ final class PlayerController: ObservableObject {
         everReady = false
         retries = 0
         faultAt = 0
+        hlsHeightLimit = nil
         resumeAt = 0
         position = 0
         duration = 0
@@ -535,10 +541,16 @@ final class PlayerController: ObservableObject {
         if !everReady && tryNext() { return }
         if let video, everReady {
             faultAt = max(faultAt, position)
-            switch PlayerErrors.midStream(fault, retries: retries, hasNextSource: !video.fallbacks.isEmpty) {
+            let isHls = current.map { MediaKind.from(url: $0.url.absoluteString) == .hls } ?? false
+            switch PlayerErrors.midStream(fault, retries: retries, hasNextSource: !video.fallbacks.isEmpty, isHls: isHls) {
             case .reconnect:
                 retries += 1
-                show("Reconnecting")
+                if isHls {
+                    let limit = PlayerErrors.hlsHeightLimit(retries: retries, playing: Int(player?.videoSize.height ?? 0), limit: hlsHeightLimit)
+                    if limit != hlsHeightLimit { lowerQualitySince = position }
+                    hlsHeightLimit = limit
+                }
+                show(hlsHeightLimit.map { "Reconnecting at \($0)p" } ?? "Reconnecting")
                 return reopen(at: position)
             case .skipAhead:
                 retries += 1
@@ -591,6 +603,8 @@ final class PlayerController: ObservableObject {
         if ticks % 2 == 0 {
             updateTime()
             if retries > 0 && position > faultAt + PlayerErrors.recoveredMs { retries = 0 }
+            // The lower quality lasts one minute. The next reconnect then takes the full quality.
+            if hlsHeightLimit != nil && position > lowerQualitySince + PlayerErrors.lowerQualityMs { hlsHeightLimit = nil }
             if overlayVisible && playing && error == nil && now > overlayUntil { overlayVisible = false }
             if message != nil && now > messageUntil { message = nil }
             labelVisible = now < labelUntil || overlayVisible
