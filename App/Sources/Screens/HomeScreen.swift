@@ -254,6 +254,8 @@ final class HomeViewModel: ObservableObject {
     private var loading: Set<String> = []
     /// The rows that did not answer. They ask again when the addons change.
     private var failed: Set<String> = []
+    /// The rows that show titles from the disk. Each asks its addon again when the addons are installed.
+    private var stale: Set<String> = []
 
     func refresh(app: AppModel) async {
         let addons = app.container.addons
@@ -263,19 +265,31 @@ final class HomeViewModel: ObservableObject {
         for key in failed { lists[key] = nil }
         failed = []
         for row in next where lists[row.key] == nil {
-            if let cached = await addons.cachedCatalog(row) { lists[row.key] = cached }
+            guard let cached = await addons.cachedCatalog(row) else { continue }
+            lists[row.key] = cached
+            if await !addons.isFresh(row) { stale.insert(row.key) }
         }
         rows = next
         types = nextTypes
         catalogs = lists
+        guard !app.addonState.loading else { return }
+        for row in next where stale.contains(row.key) {
+            Task { await load(row, app: app) }
+        }
     }
 
     func load(_ row: CatalogRow, app: AppModel) async {
-        guard catalogs[row.key] == nil, loading.insert(row.key).inserted else { return }
+        let refresh = stale.contains(row.key)
+        if refresh && app.addonState.loading { return }
+        guard catalogs[row.key] == nil || refresh, loading.insert(row.key).inserted else { return }
+        stale.remove(row.key)
         let metas: [MetaPreview]
         do {
             metas = try await app.container.addons.catalog(row)
         } catch {
+            loading.remove(row.key)
+            // A row from the disk keeps its titles when the addon does not answer.
+            if refresh { return }
             metas = []
             failed.insert(row.key)
         }

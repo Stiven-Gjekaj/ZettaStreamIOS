@@ -27,7 +27,8 @@ final class AppContainer: Sendable {
         let userAgent = "ZettaStream/\(AppInfo.version)"
         client = AddonClient(userAgent: userAgent)
         sources = SourceStore(file: files.appendingPathComponent("sources.txt"))
-        addons = AddonRepository(client: client)
+        addons = AddonRepository(client: client, kitsu: KitsuMapper(file: caches.appendingPathComponent("kitsu.json")),
+                                 disk: AddonDisk(folder: caches.appendingPathComponent("addons")))
         live = LiveLoader(client: FileClient(userAgent: userAgent, folder: caches.appendingPathComponent("live")))
         profiles = ProfileStore(root: files)
         let data = profiles.profiles
