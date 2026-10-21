@@ -6,6 +6,7 @@ final class StubServer: Sendable {
     struct Reply {
         var status = 200
         var body: String
+        var headers: [String: String] = [:]
     }
 
     fileprivate static let lock = NSLock()
@@ -22,8 +23,8 @@ final class StubServer: Sendable {
 
     func url(_ path: String) -> String { "https://\(host)\(path)" }
 
-    func reply(_ body: String, status: Int = 200) {
-        Self.lock.withLock { Self.replies[host, default: []].append(Reply(status: status, body: body)) }
+    func reply(_ body: String, status: Int = 200, headers: [String: String] = [:]) {
+        Self.lock.withLock { Self.replies[host, default: []].append(Reply(status: status, body: body, headers: headers)) }
     }
 
     /// The paths that the code asked for, in order.
@@ -53,7 +54,7 @@ final class StubServer: Sendable {
                 client?.urlProtocol(self, didFailWithError: URLError(.cannotConnectToHost))
                 return
             }
-            let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: nil)!
+            let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: reply.headers)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: Data(reply.body.utf8))
             client?.urlProtocolDidFinishLoading(self)
