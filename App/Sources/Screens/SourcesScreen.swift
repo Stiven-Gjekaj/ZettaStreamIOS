@@ -65,7 +65,14 @@ struct SourcesScreen: View {
                 .foregroundStyle(Palette.textSecondary)
             HStack(spacing: 10) {
                 Button("Save", action: save).buttonStyle(.zPrimary)
-                Button("Paste", action: paste).buttonStyle(.zSecondary)
+                // The system paste button reads the clipboard with no prompt. A plain
+                // button that reads UIPasteboard gets no text until the user permits it.
+                PasteButton(payloadType: String.self) { texts in
+                    Task { @MainActor in paste(texts.joined(separator: "\n")) }
+                }
+                .labelStyle(.titleOnly)
+                .tint(Palette.surfaceHigh)
+                .foregroundStyle(Palette.textPrimary)
             }
             if let saved {
                 Text(saved)
@@ -90,8 +97,8 @@ struct SourcesScreen: View {
     }
 
     /// The text on the clipboard takes the place of the draft. Save then replaces the list.
-    private func paste() {
-        guard let text = UIPasteboard.general.string, !text.isEmpty else {
+    private func paste(_ text: String) {
+        guard !text.isEmpty else {
             app.show("The clipboard has no text.")
             return
         }
