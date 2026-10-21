@@ -19,6 +19,9 @@ struct PlayerScreen: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
+            PlayerKeyCatcher { key, pressed in keys?.handle(key, pressed: pressed) }
+                .frame(width: 0, height: 0)
+                .accessibilityHidden(true)
             PlayerVideoView(surface: controller.surface)
                 .ignoresSafeArea()
             if controller.settings.sideBars == .ambient {

@@ -1,8 +1,64 @@
 import GameController
+import SwiftUI
+import UIKit
 import ZettaCore
 
-/// Reads the keys of a hardware keyboard and the buttons of game controllers while the
-/// player shows, and gives each press and each release as a `PlayerKey`.
+/// Gets the keys of a hardware keyboard while the player shows. UIKit gives each key press to
+/// the first responder, so this view takes that place. GameController does not get the keys of
+/// every keyboard, such as the keys of the simulator.
+struct PlayerKeyCatcher: UIViewRepresentable {
+    let onKey: (PlayerKey, Bool) -> Void
+
+    func makeUIView(context: Context) -> CatcherView {
+        let view = CatcherView()
+        view.onKey = onKey
+        return view
+    }
+
+    func updateUIView(_ view: CatcherView, context: Context) {
+        view.onKey = onKey
+        // A sheet or a button can take the first responder. The view takes it back.
+        if view.window != nil && !view.isFirstResponder { view.becomeFirstResponder() }
+    }
+
+    final class CatcherView: UIView {
+        var onKey: ((PlayerKey, Bool) -> Void)?
+
+        override var canBecomeFirstResponder: Bool { true }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if window != nil { DispatchQueue.main.async { [weak self] in self?.becomeFirstResponder() } }
+        }
+
+        override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            if !send(presses, pressed: true) { super.pressesBegan(presses, with: event) }
+        }
+
+        override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            if !send(presses, pressed: false) { super.pressesEnded(presses, with: event) }
+        }
+
+        override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            if !send(presses, pressed: false) { super.pressesCancelled(presses, with: event) }
+        }
+
+        /// True when a press is a key of the player. A key with Command goes on to the app.
+        private func send(_ presses: Set<UIPress>, pressed: Bool) -> Bool {
+            var used = false
+            for press in presses {
+                guard let key = press.key, !key.modifierFlags.contains(.command),
+                      let action = PlayerKeys.keyboard(key.keyCode.rawValue) else { continue }
+                onKey?(action, pressed)
+                used = true
+            }
+            return used
+        }
+    }
+}
+
+/// Reads the buttons of game controllers while the player shows, and gives each press and
+/// each release as a `PlayerKey`. The keys of a keyboard come through `PlayerKeyCatcher`.
 @MainActor
 final class PlayerInputs {
     private var observers: [NSObjectProtocol] = []
@@ -13,7 +69,7 @@ final class PlayerInputs {
         stop()
         self.onKey = onKey
         let center = NotificationCenter.default
-        for name in [Notification.Name.GCKeyboardDidConnect, .GCControllerDidConnect] {
+        for name in [Notification.Name.GCControllerDidConnect] {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.connect() }
             })
@@ -26,7 +82,6 @@ final class PlayerInputs {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
         onKey = nil
-        GCKeyboard.coalesced?.keyboardInput?.keyChangedHandler = nil
         for controller in GCController.controllers() {
             controller.extendedGamepad?.valueChangedHandler = nil
             Self.buttons(of: controller).forEach { $0.0.pressedChangedHandler = nil }
@@ -38,18 +93,11 @@ final class PlayerInputs {
         let send: @Sendable (PlayerKey, Bool) -> Void = { [weak self] key, pressed in
             Task { @MainActor in self?.onKey?(key, pressed) }
         }
-        Self.listen(keyboard: GCKeyboard.coalesced, send)
         for controller in GCController.controllers() { Self.listen(controller: controller, send) }
     }
 
     // The handlers below are not isolated to the main actor. GameController can call them on
     // another queue, and Swift then stops the app for a handler of the main actor.
-
-    private nonisolated static func listen(keyboard: GCKeyboard?, _ send: @escaping @Sendable (PlayerKey, Bool) -> Void) {
-        keyboard?.keyboardInput?.keyChangedHandler = { _, _, code, pressed in
-            if let key = PlayerKeys.keyboard(code.rawValue) { send(key, pressed) }
-        }
-    }
 
     private nonisolated static func listen(controller: GCController, _ send: @escaping @Sendable (PlayerKey, Bool) -> Void) {
         for (input, button) in buttons(of: controller) {
