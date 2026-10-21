@@ -22,9 +22,9 @@ let corner: CGFloat = 8
 enum Karla {
     private static let weightAxis = 0x7767_6874
 
+    /// The size follows Dynamic Type: SwiftUI scales it with `style` each time the setting changes.
     static func font(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
-        let scaled = UIFontMetrics(forTextStyle: style.uiStyle).scaledValue(for: size)
-        return Font(uiFont(scaled, weight))
+        Font.custom("Karla-Regular", size: size, relativeTo: style).weight(weight)
     }
 
     static func uiFont(_ size: CGFloat, _ weight: Font.Weight) -> UIFont {
@@ -46,24 +46,6 @@ private extension Font.Weight {
         case .bold: 700
         case .heavy, .black: 800
         default: 400
-        }
-    }
-}
-
-private extension Font.TextStyle {
-    var uiStyle: UIFont.TextStyle {
-        switch self {
-        case .largeTitle: .largeTitle
-        case .title: .title1
-        case .title2: .title2
-        case .title3: .title3
-        case .headline: .headline
-        case .subheadline: .subheadline
-        case .callout: .callout
-        case .footnote: .footnote
-        case .caption: .caption1
-        case .caption2: .caption2
-        default: .body
         }
     }
 }
