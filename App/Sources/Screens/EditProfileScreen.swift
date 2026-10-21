@@ -106,7 +106,7 @@ struct EditProfileScreen: View {
     }
 
     private var credit: some View {
-        Text("The pictures of anime characters come from AniList. The pictures of TV characters and actors come from TVmaze, "
+        Text("The pictures of anime characters come from AniList, or from Shikimori when AniList does not answer. The pictures of TV characters and actors come from TVmaze, "
             + "under CC BY-SA. The app asks these services only when you choose a picture. "
             + "The rights to each picture stay with their owners.")
             .font(Karla.font(12, relativeTo: .caption))
