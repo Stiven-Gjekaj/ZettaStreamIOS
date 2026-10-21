@@ -34,9 +34,11 @@ public enum PlayerErrors {
     /// The time that a direct link gets to show its first frame. VLC has no read time
     /// limit, so a server that sends too slowly holds the player with no fault. After
     /// this time the stream counts as one that did not start, and the next one plays.
-    /// A torrent has no limit here, because the engine first waits for its peers.
+    /// A torrent gets more time, because its peers start to send slowly. Its time starts
+    /// when the engine has the torrent information, so a torrent whose peers send no data
+    /// does not hold the player.
     public static func startLimitMs(isTorrent: Bool) -> Int? {
-        isTorrent ? nil : 45_000
+        isTorrent ? 120_000 : 45_000
     }
 
     /// An HLS stream gets more tries, as each part of it does on Android.

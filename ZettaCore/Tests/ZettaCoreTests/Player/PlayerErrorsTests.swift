@@ -47,7 +47,7 @@ struct PlayerErrorsTests {
 
     @Test func aDirectLinkHasAStartLimitAndATorrentHasNone() {
         #expect(PlayerErrors.startLimitMs(isTorrent: false) == 45_000)
-        #expect(PlayerErrors.startLimitMs(isTorrent: true) == nil)
+        #expect(PlayerErrors.startLimitMs(isTorrent: true) == 120_000)
     }
 
     @Test func anHlsStreamReconnectsSixTimesAndAFileThreeTimes() {
