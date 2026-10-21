@@ -69,6 +69,8 @@ struct LibraryLoadingBar: View {
         .onAppear {
             withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) { moving = true }
         }
-        .accessibilityLabel("Loading")
+        // A bar of 3 points is too small to touch with VoiceOver. The content of the
+        // screen comes when the load ends, and VoiceOver reads it then.
+        .accessibilityHidden(true)
     }
 }
