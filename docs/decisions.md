@@ -150,3 +150,32 @@ A choice there applies here too, if this list does not replace it.
   inside a `do` block. All answers went into the first place, so the app kept
   one addon of a long list, and the other addons seemed to hang. The debug
   tests passed, because the debug build does not have the fault.
+
+## 2026-10-21: Keys of a keyboard and a game controller
+
+- In the player, the keys of a keyboard and the buttons of a game controller
+  do the actions of the remote control of the Android app.
+  - Left and Right seek 10 seconds. A held key seeks 30 seconds again and
+    again.
+  - Return or A plays and pauses, or skips while a skip prompt shows. A long
+    press opens the options.
+  - Escape or B closes the player.
+  - Tab, X, or Menu opens the options.
+  - The keys 1 to 9 go to that tenth of the video.
+  - Space and K play and pause. J and L seek. C changes the subtitles, A the
+    audio, S skips, and N and P change the episode or the channel.
+  - The shoulder buttons change the episode or the channel.
+- Command and 1 to 5 open the tabs. The numbers alone type into the search
+  field, so the shortcut needs Command.
+- A game controller does not move through the screens outside the player.
+  Reason: SwiftUI on iOS has no focus for a game controller.
+
+## 2026-10-21: The keep times of the playlists and the guides
+
+- A playlist stays on the disk for one hour, and a guide for six hours. In
+  that time, Live TV uses the file and does not download it again.
+- The guide downloads into a file, and the XML parser reads it one part at a
+  time. A guide of 321 MB needs 31 MB of memory in place of 383 MB.
+- Reason: the Android app keeps the files in its HTTP cache for these times,
+  and reads the guide as a stream.
+

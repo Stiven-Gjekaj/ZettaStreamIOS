@@ -57,7 +57,11 @@ The app comes with no sources. You add your own list.
 - A "New episodes" row, a trailer, the cast, and "More like this"
 - "Explore more" at the end of each row opens all of its titles in a grid
 - Live TV from M3U playlists, with now and next from an XMLTV guide,
-  favourite channels, and a guide grid
+  favourite channels, and a guide grid. A playlist stays on the device for
+  one hour and a guide for six hours
+- Voice search
+- A keyboard or a game controller controls the player. Command and 1 to 5
+  open the tabs
 - Picture in Picture and playback in the background
 - Back up and restore the library, the settings, and the sources. The file
   has the same form as the backup of the Android app
