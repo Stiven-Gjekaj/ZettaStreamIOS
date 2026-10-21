@@ -29,6 +29,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>ZettaStream plays torrent streams through a server on this device.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Karla.ttf</string>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

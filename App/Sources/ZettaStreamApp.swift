@@ -6,10 +6,9 @@ struct ZettaStreamApp: App {
     var body: some Scene {
         WindowGroup {
             Text("ZettaStream")
-                .font(.largeTitle.bold())
+                .font(Karla.font(34, .bold, relativeTo: .largeTitle))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black)
-                .foregroundStyle(.white)
+                .zettaScreen()
         }
     }
 }
