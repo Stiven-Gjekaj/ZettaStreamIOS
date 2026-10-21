@@ -5,6 +5,10 @@ import ZettaCore
 struct SettingsScreen: View {
     @EnvironmentObject private var app: AppModel
     @State private var confirmClear = false
+    @State private var backupFile: SettingsBackupFile?
+    @State private var exporting = false
+    @State private var importing = false
+    @State private var restoreReport: String?
 
     private var viewer: ViewerSettings { app.settings }
 
@@ -16,6 +20,7 @@ struct SettingsScreen: View {
                 viewing
                 torrents
                 SettingsSection(title: "App")
+                backup
                 SettingsRow(title: "Clear the watch history", detail: "Removes the progress of each video. The watchlist stays.") {
                     confirmClear = true
                 }
@@ -107,6 +112,39 @@ struct SettingsScreen: View {
         }
         SettingsRow(title: "VPN notice at start", detail: onOff(viewer.vpnNotice)) {
             app.updateSettings { $0.vpnNotice.toggle() }
+        }
+    }
+
+    /// The exporter and the importer are on two rows. On iOS 16, only one file sheet works on one view.
+    @ViewBuilder
+    private var backup: some View {
+        SettingsRow(
+            title: "Back up",
+            detail: "Saves the watchlist, the history, the favourite channels, the settings, and the source list in one file."
+        ) {
+            guard let text = app.exportBackup() else { return }
+            backupFile = SettingsBackupFile(text: text)
+            exporting = true
+        }
+        .fileExporter(isPresented: $exporting, document: backupFile, contentType: .json, defaultFilename: "zettastream-backup") { result in
+            switch result {
+            case .success: app.show("The backup is saved.")
+            case .failure(let error): app.show("The backup was not saved: \(error.localizedDescription)")
+            }
+            backupFile = nil
+        }
+        SettingsRow(title: "Restore", detail: restoreReport ?? "Restores a backup. It replaces the data on this device.") {
+            importing = true
+        }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
+            do {
+                let report = try app.restoreBackup(SettingsFileReader.text(of: result.get()))
+                restoreReport = report
+                app.show(report)
+            } catch {
+                restoreReport = nil
+                app.show(error.localizedDescription)
+            }
         }
     }
 
