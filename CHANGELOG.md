@@ -12,6 +12,16 @@ major number. See "Version numbers" in the decisions.
 A tag such as `v0.1.0` builds the unsigned IPA and attaches it to a release on
 GitHub as `ZettaStream.ipa`.
 
+## 0.1.3 (2026-10-21)
+
+- Adds voice search. The microphone button in the search field listens for a
+  title.
+- A keyboard or a game controller controls the player, with the keys of the
+  remote control of the Android app. Command and 1 to 5 open the tabs.
+- Keeps a playlist for one hour and a guide for six hours, so that Live TV
+  opens faster.
+- Reads a large TV guide with much less memory.
+
 ## 0.1.2 (2026-10-21)
 
 - Finds the streams of a new anime that has only a MyAnimeList ID, such as
