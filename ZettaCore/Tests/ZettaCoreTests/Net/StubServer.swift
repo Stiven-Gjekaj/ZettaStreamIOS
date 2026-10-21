@@ -5,7 +5,7 @@ import Foundation
 final class StubServer: Sendable {
     struct Reply {
         var status = 200
-        var body: String
+        var body: Data
     }
 
     fileprivate static let lock = NSLock()
@@ -23,7 +23,12 @@ final class StubServer: Sendable {
     func url(_ path: String) -> String { "https://\(host)\(path)" }
 
     func reply(_ body: String, status: Int = 200) {
-        Self.lock.withLock { Self.replies[host, default: []].append(Reply(status: status, body: body)) }
+        reply(data: Data(body.utf8), status: status)
+    }
+
+    /// Answers with bytes, such as a gzip file.
+    func reply(data: Data, status: Int = 200) {
+        Self.lock.withLock { Self.replies[host, default: []].append(Reply(status: status, body: data)) }
     }
 
     /// The paths that the code asked for, in order.
@@ -55,7 +60,7 @@ final class StubServer: Sendable {
             }
             let response = HTTPURLResponse(url: request.url!, statusCode: reply.status, httpVersion: nil, headerFields: nil)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: Data(reply.body.utf8))
+            client?.urlProtocol(self, didLoad: reply.body)
             client?.urlProtocolDidFinishLoading(self)
         }
 
