@@ -20,6 +20,10 @@ public struct LiveState: Hashable, Sendable {
 /// Loads the IPTV playlists and the TV guides in the source list.
 public struct LiveLoader: Sendable {
     private static let hour: Int64 = 3_600_000
+    /// The seconds that a playlist and a guide stay on the disk before they download again.
+    /// These are the times of the Android app.
+    public static let playlistKeep: TimeInterval = 3_600
+    public static let guideKeep: TimeInterval = 6 * 3_600
     private let client: FileClient
 
     public init(client: FileClient = FileClient()) {
@@ -33,7 +37,7 @@ public struct LiveLoader: Sendable {
         var failures: [String: String] = [:]
         let playlistUrls = sources.filter { $0.kind == .playlist }.map(\.url)
         let playlists = await inOrder(playlistUrls) { url in
-            M3u.parse(String(decoding: try await client.data(url), as: UTF8.self))
+            M3u.parse(String(decoding: try await client.data(url, keepFor: Self.playlistKeep), as: UTF8.self))
         }
         var loaded: [Playlist] = []
         for (url, result) in zip(playlistUrls, playlists) {
@@ -55,7 +59,7 @@ public struct LiveLoader: Sendable {
         if !ids.isEmpty {
             let from = now - 3 * Self.hour, to = now + 24 * Self.hour
             let guides = await inOrder(guideUrls) { url in
-                try Xmltv.parse(try await client.data(url), channelIds: ids, from: from, to: to)
+                try Xmltv.parse(try await client.data(url, keepFor: Self.guideKeep), channelIds: ids, from: from, to: to)
             }
             for (url, result) in zip(guideUrls, guides) {
                 switch result {

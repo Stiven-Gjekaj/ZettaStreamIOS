@@ -8,8 +8,29 @@ struct LiveLoaderTests {
     private let now: Int64 = 1_791_455_400_000
 
     /// The session of one stub server also answers for the hosts of the others.
-    private func loader(_ server: StubServer) -> LiveLoader {
-        LiveLoader(client: FileClient(session: server.session, userAgent: "ZettaStream/test"))
+    private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("live-\(UUID().uuidString)")
+
+    private func loader(_ server: StubServer, at time: TimeInterval = 0) -> LiveLoader {
+        LiveLoader(client: FileClient(session: server.session, userAgent: "ZettaStream/test", folder: folder,
+                                      clock: { Date(timeIntervalSince1970: time) }))
+    }
+
+    @Test func aPlaylistKeepsOneHourAndAGuideSixHours() async {
+        let list = StubServer(), guide = StubServer()
+        let sources = [Source(url: list.url("/list.m3u"), kind: .playlist), Source(url: guide.url("/g.xml"), kind: .guide)]
+        let playlist = "#EXTM3U\n#EXTINF:-1 tvg-id=\"news.test\",News\nhttps://s.test/news.m3u8"
+        let xml = "<tv>\(programme("news.test", "Morning", "20261008100000", "20261008110000"))</tv>"
+        for _ in 0..<3 { list.reply(playlist); guide.reply(xml) }
+        _ = await loader(list, at: 0).load(sources, now: now)
+        _ = await loader(list, at: LiveLoader.playlistKeep - 1).load(sources, now: now)
+        #expect((list.paths.count, guide.paths.count) == (1, 1))
+        _ = await loader(list, at: LiveLoader.playlistKeep).load(sources, now: now)
+        #expect((list.paths.count, guide.paths.count) == (2, 1))
+        let state = await loader(list, at: LiveLoader.guideKeep).load(sources, now: now)
+        #expect((list.paths.count, guide.paths.count) == (3, 2))
+        #expect(state.guide.nowAndNext("news.test", now: now).now?.title == "Morning")
+        #expect(LiveLoader.playlistKeep == 3_600)
+        #expect(LiveLoader.guideKeep == 21_600)
     }
 
     private func programme(_ channel: String, _ title: String, _ start: String, _ stop: String) -> String {

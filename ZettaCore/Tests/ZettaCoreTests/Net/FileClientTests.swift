@@ -4,7 +4,12 @@ import Testing
 
 struct FileClientTests {
     private let server = StubServer()
-    private var client: FileClient { FileClient(session: server.session, userAgent: "ZettaStream/test") }
+    private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("files-\(UUID().uuidString)")
+    private var client: FileClient { FileClient(session: server.session, userAgent: "ZettaStream/test", folder: folder) }
+
+    private func client(at time: TimeInterval) -> FileClient {
+        FileClient(session: server.session, userAgent: "ZettaStream/test", folder: folder, clock: { Date(timeIntervalSince1970: time) })
+    }
 
     @Test func aGzipFileIsOpenedAlsoWithNoGzName() async throws {
         // The output of `printf '#EXTM3U\n' | gzip -n`.
@@ -28,5 +33,41 @@ struct FileClientTests {
         await #expect(throws: HTTPError(status: 404, url: server.url("/list.m3u"))) {
             try await client.data(server.url("/list.m3u"))
         }
+    }
+
+    @Test func aFileIsUsedAgainUntilItsKeepTimeEnds() async throws {
+        let url = server.url("/list.m3u")
+        server.reply("one")
+        server.reply("two")
+        #expect(try await client(at: 1_000).data(url, keepFor: 60) == Data("one".utf8))
+        #expect(try await client(at: 1_059).data(url, keepFor: 60) == Data("one".utf8))
+        #expect(server.paths.count == 1)
+        #expect(try await client(at: 1_060).data(url, keepFor: 60) == Data("two".utf8))
+        #expect(server.paths.count == 2)
+    }
+
+    @Test func noKeepTimeAlwaysDownloads() async throws {
+        let url = server.url("/list.m3u")
+        server.reply("one")
+        server.reply("two")
+        #expect(try await client(at: 1_000).data(url, keepFor: 60) == Data("one".utf8))
+        #expect(try await client(at: 1_001).data(url) == Data("two".utf8))
+    }
+
+    @Test func aFailedDownloadKeepsTheEarlierFile() async throws {
+        let url = server.url("/list.m3u")
+        server.reply("one")
+        server.reply("gone", status: 503)
+        _ = try await client(at: 1_000).data(url)
+        await #expect(throws: HTTPError(status: 503, url: url)) { try await client(at: 2_000).data(url) }
+        #expect(try await client(at: 1_010).data(url, keepFor: 60) == Data("one".utf8))
+    }
+
+    @Test func twoUrlsHaveTwoFiles() async throws {
+        server.reply("a")
+        server.reply("b")
+        #expect(try await client(at: 0).data(server.url("/a"), keepFor: 60) == Data("a".utf8))
+        #expect(try await client(at: 0).data(server.url("/b"), keepFor: 60) == Data("b".utf8))
+        #expect(FileClient.name(server.url("/a")).count == 64)
     }
 }

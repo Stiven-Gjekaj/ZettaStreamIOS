@@ -28,7 +28,7 @@ final class AppContainer: Sendable {
         client = AddonClient(userAgent: userAgent)
         sources = SourceStore(file: files.appendingPathComponent("sources.txt"))
         addons = AddonRepository(client: client)
-        live = LiveLoader(client: FileClient(userAgent: userAgent))
+        live = LiveLoader(client: FileClient(userAgent: userAgent, folder: caches.appendingPathComponent("live")))
         profiles = ProfileStore(root: files)
         let data = profiles.profiles
         let current = data.profiles.first { $0.id == data.last } ?? data.profiles[0]
