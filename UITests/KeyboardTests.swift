@@ -17,14 +17,18 @@ final class KeyboardTests: XCTestCase {
         app.typeKey("2", modifierFlags: .command)
 
         app.buttons["Voice search"].tap()
-        // The system asks for speech recognition, then for the microphone.
+        // The first time, the system asks for speech recognition and the microphone.
+        // After a refusal, the app shows a message.
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let alert = springboard.alerts.firstMatch
-        XCTAssertTrue(alert.waitForExistence(timeout: 10), "Voice search does not ask for access.")
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        attachment.lifetime = .keepAlways
-        add(attachment)
-        alert.buttons.element(boundBy: 0).tap()
+        let refused = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Voice search needs'")).firstMatch
+        var asked = false
+        for _ in 0..<20 where !asked {
+            asked = alert.exists || refused.exists
+            if !asked { usleep(500_000) }
+        }
+        XCTAssertTrue(asked, "Voice search does not ask for access.")
+        if alert.exists { alert.buttons.element(boundBy: 0).tap() }
         XCTAssertEqual(app.state, .runningForeground)
     }
 }
