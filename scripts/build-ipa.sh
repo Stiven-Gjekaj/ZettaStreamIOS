@@ -22,5 +22,11 @@ xcodebuild \
 rm -rf build/ipa
 mkdir -p build/ipa/Payload
 cp -R build/derived/Build/Products/Release-iphoneos/ZettaStream.app build/ipa/Payload/
+# VLCKit comes with its local symbols. The app does not need them.
+for binary in build/ipa/Payload/ZettaStream.app/Frameworks/*.framework/*; do
+  if [ -f "$binary" ] && file "$binary" | grep -q "Mach-O"; then
+    strip -x "$binary"
+  fi
+done
 (cd build/ipa && zip -qry ../ZettaStream.ipa Payload)
 echo "build/ZettaStream.ipa"

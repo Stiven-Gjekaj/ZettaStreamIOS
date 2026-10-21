@@ -45,6 +45,14 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: "NO"
         INFOPLIST_FILE: App/Info.plist
+      # A plain build does not strip the binary. The IPA is a plain build, not an
+      # archive, so these settings strip it. The release has no dSYM to keep.
+      configs:
+        Release:
+          DEPLOYMENT_POSTPROCESSING: "YES"
+          STRIP_INSTALLED_PRODUCT: "YES"
+          STRIP_STYLE: all
+          DEAD_CODE_STRIPPING: "YES"
   ZettaStreamUITests:
     type: bundle.ui-testing
     platform: iOS
