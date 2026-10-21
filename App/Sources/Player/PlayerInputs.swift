@@ -28,7 +28,40 @@ struct PlayerKeyCatcher: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
-            if window != nil { DispatchQueue.main.async { [weak self] in self?.becomeFirstResponder() } }
+            if window != nil {
+                takeKeys()
+                NotificationCenter.default.addObserver(self, selector: #selector(takeKeys), name: UIApplication.didBecomeActiveNotification, object: nil)
+            } else {
+                NotificationCenter.default.removeObserver(self)
+            }
+        }
+
+        // The player has no text field, so the view takes the keys back when a sheet,
+        // Picture in Picture, or the system takes them.
+        override func resignFirstResponder() -> Bool {
+            let done = super.resignFirstResponder()
+            takeKeys()
+            return done
+        }
+
+        // UIKit uses Escape for its own commands before it gives the press to a view.
+        // A key command with priority gets it first.
+        override var keyCommands: [UIKeyCommand]? {
+            let escape = UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(escapePressed))
+            escape.wantsPriorityOverSystemBehavior = true
+            return [escape]
+        }
+
+        @objc private func escapePressed() {
+            onKey?(.back, true)
+            onKey?(.back, false)
+        }
+
+        @objc private func takeKeys() {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.window != nil, !self.isFirstResponder else { return }
+                self.becomeFirstResponder()
+            }
         }
 
         override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
