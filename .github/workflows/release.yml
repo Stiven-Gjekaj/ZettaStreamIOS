@@ -16,6 +16,10 @@ jobs:
         run: brew install xcodegen
       - name: Test the core package
         run: swift test --package-path ZettaCore
+      # The IPA is a release build. The optimizer can change what the code does,
+      # so the tests also run in that configuration.
+      - name: Test the core package in a release build
+        run: swift test -c release --package-path ZettaCore
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
