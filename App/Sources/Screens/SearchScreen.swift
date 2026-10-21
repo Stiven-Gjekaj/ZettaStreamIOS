@@ -50,6 +50,7 @@ final class SearchModel: ObservableObject {
 struct SearchScreen: View {
     @EnvironmentObject private var app: AppModel
     @StateObject private var model = SearchModel()
+    @StateObject private var voice = VoiceSearch()
     @FocusState private var fieldFocused: Bool
     /// True after the viewer scrolls the results. Then a better match that comes late does not move the list.
     @State private var scrolled = false
@@ -72,13 +73,13 @@ struct SearchScreen: View {
         }
         .zettaScreen()
         .toolbar(.hidden, for: .navigationBar)
+        .onDisappear { voice.stop() }
     }
 
     private var field: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(Palette.textSecondary)
-            // The keyboard has a microphone, so the viewer can also say the title.
             TextField("", text: $model.text, prompt: Text("Search titles").foregroundColor(Palette.textSecondary))
                 .font(Karla.font(16))
                 .foregroundStyle(Palette.textPrimary)
@@ -97,6 +98,14 @@ struct SearchScreen: View {
                 }
                 .accessibilityLabel("Clear the search")
             }
+            Button(action: listen) {
+                Image(systemName: voice.listening ? "mic.fill" : "mic")
+                    .font(.system(size: 18))
+                    .foregroundStyle(voice.listening ? Palette.accent : Palette.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(voice.listening ? "Stop listening" : "Voice search")
         }
         .padding(.horizontal, 14)
         .frame(minHeight: 52)
@@ -142,7 +151,7 @@ struct SearchScreen: View {
         } else if showRecent {
             recent
         } else if model.query.isEmpty {
-            LibraryMessage(title: "Find a film, a series, or an anime", text: "Type a title and press Search.")
+            LibraryMessage(title: "Find a film, a series, or an anime", text: "Type or say a title, and press Search.")
         } else if !model.results.isEmpty {
             Text("\(Display.count(model.results.count, "result")) for \"\(model.query)\"")
                 .font(Karla.font(14))
@@ -180,6 +189,23 @@ struct SearchScreen: View {
         }
         .padding(.horizontal, libraryGutter)
         .padding(.vertical, 16)
+    }
+
+    /// Starts voice search, or stops it. The words go into the field, and the search starts when the viewer stops talking.
+    private func listen() {
+        if voice.listening {
+            voice.stop()
+            return
+        }
+        fieldFocused = false
+        voice.start(
+            onWords: { model.text = $0 },
+            onEnd: { said in
+                guard !said.isEmpty else { return }
+                model.text = said
+                submit()
+            },
+            onError: app.show)
     }
 
     private func submit() {
