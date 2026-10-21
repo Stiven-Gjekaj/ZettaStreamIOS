@@ -11,6 +11,7 @@ struct SettingsScreen: View {
     @State private var restoreReport: String?
     @State private var updateText: String?
     @State private var found: Release?
+    @State private var showAbout = false
     @Environment(\.openURL) private var openURL
 
     private var viewer: ViewerSettings { app.settings }
@@ -28,11 +29,15 @@ struct SettingsScreen: View {
                     confirmClear = true
                 }
                 update
+                SettingsRow(title: "About", detail: "The version, the code on GitHub, the terms, and the licenses.") {
+                    showAbout = true
+                }
             }
             .padding(.vertical, 16)
         }
         .zettaScreen()
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showAbout) { SettingsAboutView() }
         .alert("Clear the watch history?", isPresented: $confirmClear) {
             Button("Clear", role: .destructive) { app.clearHistory() }
             Button("Cancel", role: .cancel) {}
