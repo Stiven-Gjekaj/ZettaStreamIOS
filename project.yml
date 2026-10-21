@@ -17,6 +17,9 @@ settings:
 packages:
   ZettaCore:
     path: ZettaCore
+  VLCKit:
+    url: https://github.com/videolan/vlckit
+    revision: 2e0868f5ed40fe59cd92f377645fdcc260c6e759
 targets:
   ZettaStream:
     type: application
@@ -26,6 +29,7 @@ targets:
       - App/Resources
     dependencies:
       - package: ZettaCore
+      - package: VLCKit
       # The torrent engine. scripts/build-torrent.sh builds it. gomobile makes
       # a static framework, so the app links it and does not embed it.
       - framework: Frameworks/ZettaTorrent.xcframework
