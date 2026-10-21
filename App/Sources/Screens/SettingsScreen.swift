@@ -9,6 +9,9 @@ struct SettingsScreen: View {
     @State private var exporting = false
     @State private var importing = false
     @State private var restoreReport: String?
+    @State private var updateText: String?
+    @State private var found: Release?
+    @Environment(\.openURL) private var openURL
 
     private var viewer: ViewerSettings { app.settings }
 
@@ -24,6 +27,7 @@ struct SettingsScreen: View {
                 SettingsRow(title: "Clear the watch history", detail: "Removes the progress of each video. The watchlist stays.") {
                     confirmClear = true
                 }
+                update
             }
             .padding(.vertical, 16)
         }
@@ -146,6 +150,44 @@ struct SettingsScreen: View {
                 app.show(error.localizedDescription)
             }
         }
+    }
+
+    /// iOS does not let the app install an update, so a newer version opens its release page on GitHub.
+    @ViewBuilder
+    private var update: some View {
+        if let release = found ?? app.latestRelease {
+            SettingsRow(
+                title: "Get version \(release.version)",
+                detail: updateText ?? "Opens the release page on GitHub. Install the new version from there."
+            ) { openRelease(release) }
+        } else {
+            SettingsRow(title: "Check for updates", detail: updateText ?? "Version \(AppInfo.version)") {
+                checkForUpdate()
+            }
+        }
+    }
+
+    private func checkForUpdate() {
+        updateText = "Checking"
+        let checker = app.container.updates
+        Task {
+            guard let latest = await checker.latest() else {
+                updateText = "GitHub did not answer. Try again later."
+                return
+            }
+            if Version.isNewer(latest.version, than: AppInfo.version) {
+                found = latest
+                updateText = "Version \(latest.version) is available. The release page opens."
+                openRelease(latest)
+            } else {
+                updateText = "Version \(AppInfo.version) is the newest"
+            }
+        }
+    }
+
+    private func openRelease(_ release: Release) {
+        guard let url = URL(string: release.pageUrl) else { return }
+        openURL(url)
     }
 
     /// A row with each case of a choice of the viewer settings.
