@@ -56,7 +56,8 @@ struct SourcesScreen: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .padding(8)
-                .frame(minHeight: 180)
+                // A long list scrolls inside the editor, so Save and Paste stay near it.
+                .frame(height: 220)
                 .background(Palette.surface, in: RoundedRectangle(cornerRadius: corner))
                 .overlay(RoundedRectangle(cornerRadius: corner).stroke(editing ? Palette.accent : Palette.outline))
             Text("The new list replaces the old list. To remove a source, remove its line. "
