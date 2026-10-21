@@ -95,6 +95,65 @@ public enum TorrentMath {
         return patterns.contains { StreamRegex($0).matches(n) }
     }
 
+    /// The numbers from `low` to `high`. Empty when `high` is less than `low`.
+    private static func span(_ low: Int, _ high: Int) -> [Int] {
+        high < low ? [] : Array(low...high)
+    }
+
+    /// Selects the pieces to download: the head and the tail of the file,
+    /// which a player reads first, and a window ahead of the read position.
+    /// The engine downloads nothing else, so it does not take the whole file.
+    public static func wanted(firstPiece: Int, lastPiece: Int, readPiece: Int, aheadPieces: Int, edgePieces: Int) -> Set<Int> {
+        if lastPiece < firstPiece { return [] }
+        let head = span(firstPiece, min(lastPiece, firstPiece + edgePieces - 1))
+        let tail = span(max(firstPiece, lastPiece - edgePieces + 1), lastPiece)
+        let start = min(max(readPiece, firstPiece), lastPiece)
+        let window = span(start, min(lastPiece, start + aheadPieces))
+        return Set(head + tail + window)
+    }
+
+    /// A piece that the player needs now.
+    public static let priorityNow = 7
+    /// A piece that the player needs later. It downloads only with spare speed.
+    public static let priorityLater = 1
+
+    /// Gives a priority to each piece of the torrent. The pieces right after
+    /// `readPiece` are needed now. The rest of the window ahead, and the head and
+    /// the tail of the file, download only with spare speed. All other pieces do
+    /// not download. With one priority for all wanted pieces, the next piece
+    /// shares the speed with a hundred others and comes late.
+    public static func priorities(numPieces: Int, firstPiece: Int, lastPiece: Int, readPiece: Int,
+                                  nowPieces: Int, aheadPieces: Int, edgePieces: Int) -> [Int] {
+        var out = [Int](repeating: 0, count: max(0, numPieces))
+        for p in wanted(firstPiece: firstPiece, lastPiece: lastPiece, readPiece: readPiece, aheadPieces: aheadPieces, edgePieces: edgePieces)
+        where out.indices.contains(p) {
+            out[p] = priorityLater
+        }
+        guard lastPiece >= firstPiece else { return out }
+        let start = min(max(readPiece, firstPiece), lastPiece)
+        for p in span(start, min(lastPiece + 1, start + nowPieces) - 1) where out.indices.contains(p) {
+            out[p] = priorityNow
+        }
+        return out
+    }
+
+    private static let mib: Int64 = 1024 * 1024
+
+    /// The bytes that the player needs now, after the read position.
+    public static let nowBytes: Int64 = 4 * mib
+
+    /// The bytes to download ahead of the play position: about 1/30 of the file,
+    /// which is about three minutes of a film, from 24 MB to 96 MB. A fixed large
+    /// window downloads much that a viewer who stops early never needs.
+    public static func windowBytes(fileSize: Int64) -> Int64 {
+        min(max(fileSize / 30, 24 * mib), 96 * mib)
+    }
+
+    /// The number of pieces in `bytes`, at least one.
+    public static func piecesFor(bytes: Int64, pieceLength: Int) -> Int {
+        max(1, Int((bytes + Int64(pieceLength) - 1) / Int64(pieceLength)))
+    }
+
     /// The extension of a name after its last dot, in lower case. Empty when there is no dot.
     private static func fileExtension(_ name: String) -> String {
         name.lastIndex(of: ".").map { name[name.index(after: $0)...].lowercased() } ?? ""

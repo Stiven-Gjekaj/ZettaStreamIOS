@@ -64,6 +64,40 @@ struct TorrentMathTests {
         #expect(TorrentMath.chooseFile(names: ["a.mkv", "b.mkv"], sizes: [7, 7], preferred: nil) == 0)
     }
 
+    @Test func onlyTheHeadTheTailAndTheWindowAreWanted() {
+        let wanted = TorrentMath.wanted(firstPiece: 10, lastPiece: 109, readPiece: 50, aheadPieces: 5, edgePieces: 2)
+        #expect(wanted == [10, 11, 108, 109, 50, 51, 52, 53, 54, 55])
+    }
+
+    @Test func theWindowStopsAtTheEndOfTheFile() {
+        #expect(TorrentMath.wanted(firstPiece: 0, lastPiece: 9, readPiece: 8, aheadPieces: 5, edgePieces: 1) == [0, 8, 9])
+        #expect(TorrentMath.wanted(firstPiece: 0, lastPiece: 3, readPiece: 0, aheadPieces: 10, edgePieces: 1) == [0, 1, 2, 3])
+    }
+
+    @Test func noEdgeAndAnEmptyFileWantLittle() {
+        #expect(TorrentMath.wanted(firstPiece: 0, lastPiece: 9, readPiece: 4, aheadPieces: 1, edgePieces: 0) == [4, 5])
+        #expect(TorrentMath.wanted(firstPiece: 5, lastPiece: 4, readPiece: 4, aheadPieces: 1, edgePieces: 1).isEmpty)
+    }
+
+    @Test func onlyThePiecesAfterTheReadPositionAreNeededNow() {
+        let levels = TorrentMath.priorities(numPieces: 100, firstPiece: 0, lastPiece: 99, readPiece: 40, nowPieces: 3, aheadPieces: 10, edgePieces: 2)
+        #expect(levels.indices.filter { levels[$0] == TorrentMath.priorityNow } == [40, 41, 42])
+        #expect(levels.indices.filter { levels[$0] == TorrentMath.priorityLater } == [0, 1] + Array(43...50) + [98, 99])
+        #expect(levels[60] == 0)
+    }
+
+    @Test func theWindowFollowsTheSizeOfTheFile() {
+        let mb: Int64 = 1024 * 1024
+        #expect(TorrentMath.windowBytes(fileSize: 300 * mb) == 24 * mb)
+        #expect(TorrentMath.windowBytes(fileSize: 1_626_000_000) == 1_626_000_000 / 30)
+        #expect(TorrentMath.windowBytes(fileSize: 20_000 * mb) == 96 * mb)
+    }
+
+    @Test func piecesForRoundsUp() {
+        #expect(TorrentMath.piecesFor(bytes: 2_500_000, pieceLength: 1_000_000) == 3)
+        #expect(TorrentMath.piecesFor(bytes: 0, pieceLength: 1_000_000) == 1)
+    }
+
     @Test func theMimeTypeComesFromTheExtension() {
         #expect(TorrentMath.mimeType("a.MKV") == "video/x-matroska")
         #expect(TorrentMath.mimeType("a.mp4") == "video/mp4")
