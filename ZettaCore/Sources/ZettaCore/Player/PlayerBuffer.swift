@@ -30,4 +30,9 @@ public struct PlayerBuffer: Hashable, Sendable {
             afterStallMs: isTorrent ? 20_000 : 12_000
         )
     }
+
+    /// The `network-caching` value of VLC. VLC has one value for the start and for the wait
+    /// after a stall. Two times the wait of the start is between the two waits of the Android
+    /// player: the start stays short, and a stall does not come back after a few seconds.
+    public var networkCachingMs: Int { forPlaybackMs * 2 }
 }
