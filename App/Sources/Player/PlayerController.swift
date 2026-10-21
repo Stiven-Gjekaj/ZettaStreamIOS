@@ -271,6 +271,18 @@ final class PlayerController: ObservableObject {
         let player = makePlayer()
         player.media = media
         player.play()
+        watchStart(of: generation)
+    }
+
+    /// Moves to the next stream when this one shows no frame in time. See PlayerErrors.startLimitMs.
+    private func watchStart(of number: Int) {
+        guard let limit = PlayerErrors.startLimitMs(isTorrent: video?.torrent != nil) else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(limit) * 1_000_000)
+            guard let self, number == self.generation, !self.closed, !self.playerReady, !self.playerEnded else { return }
+            self.playerEnded = true
+            self.failed(.network, reason: "no picture after \(limit / 1000) s")
+        }
     }
 
     private func makePlayer() -> VLCMediaPlayer {

@@ -31,6 +31,14 @@ public enum PlayerErrors {
     /// The number of reconnects in a row, with no playback between them.
     public static let maxRetries = 3
 
+    /// The time that a direct link gets to show its first frame. VLC has no read time
+    /// limit, so a server that sends too slowly holds the player with no fault. After
+    /// this time the stream counts as one that did not start, and the next one plays.
+    /// A torrent has no limit here, because the engine first waits for its peers.
+    public static func startLimitMs(isTorrent: Bool) -> Int? {
+        isTorrent ? nil : 45_000
+    }
+
     /// Good playback this far past a fault ends the count of tries.
     public static let recoveredMs = 30_000
 

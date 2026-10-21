@@ -44,4 +44,9 @@ struct PlayerErrorsTests {
         #expect(PlayerErrors.midStream(.other(name: "X"), retries: 0, hasNextSource: true) == .reconnect)
         #expect(PlayerErrors.midStream(.other(name: "X"), retries: 1, hasNextSource: true) == .nextSource)
     }
+
+    @Test func aDirectLinkHasAStartLimitAndATorrentHasNone() {
+        #expect(PlayerErrors.startLimitMs(isTorrent: false) == 45_000)
+        #expect(PlayerErrors.startLimitMs(isTorrent: true) == nil)
+    }
 }
