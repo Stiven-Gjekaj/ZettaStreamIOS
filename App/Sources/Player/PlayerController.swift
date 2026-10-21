@@ -249,6 +249,8 @@ final class PlayerController: ObservableObject {
     /// Opens `url` in a new VLC player at `startAt` milliseconds.
     private func open(_ url: URL, headers: [String: String], startAt: Int) {
         guard !closed, let media = VLCMedia(url: url) else { return badLink() }
+        let link = String(url.absoluteString.prefix { $0 != "?" }.prefix(100))
+        Diagnostics.shared.log("Player", "load \(video?.sourceLabel ?? "channel") from \(link), start at \(startAt)")
         current = (url, headers)
         resumeAt = startAt
         let buffer = PlayerBuffer.of(isTorrent: video?.torrent != nil)
@@ -506,6 +508,7 @@ final class PlayerController: ObservableObject {
     }
 
     private func failed(_ fault: PlaybackFault, reason: String?) {
+        Diagnostics.shared.log("Player", "fault \(fault) at \(position) of \(duration): \(reason ?? "no reason")")
         if !everReady && tryNext() { return }
         if let video, everReady {
             faultAt = max(faultAt, position)
@@ -549,6 +552,7 @@ final class PlayerController: ObservableObject {
         let following = VideoPlayback(meta: video.meta, videoId: video.videoId, label: video.label, episodes: video.episodes,
                                       listed: next, subtitles: video.subtitles, fallbacks: Array(video.fallbacks.dropFirst()))
         let name = following.sourceLabel ?? next.addon.name
+        Diagnostics.shared.log("Player", "\(video.sourceLabel ?? "stream") \(midStream ? "stopped" : "did not start"), next: \(name)")
         replace(following)
         show(midStream ? "That stream stopped. Going on with \(name)" : "That stream did not start. Trying \(name)")
         return true
@@ -627,6 +631,7 @@ final class PlayerController: ObservableObject {
                 let found = await app.sameSourcePlayback(from: video, target: target, label: Episodes.label(target))
                 guard let self, self.video?.videoId == video.videoId else { return }
                 self.preparedNext = (target.id, found)
+                Diagnostics.shared.log("Player", "prepared next \(target.id): \(found?.sourceLabel ?? "no match, the list of streams opens")")
                 self.preparing = false
             }
         }
