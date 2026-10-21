@@ -65,8 +65,17 @@ The app comes with no sources. You add your own list.
 
 ## Install
 
-ZettaStream is not in the App Store. Each release has an unsigned
-`ZettaStream.ipa`. Sign and install it with one of these tools:
+ZettaStream is not in the App Store.
+
+**With SideStore or AltStore:** add this source one time. The app then gets
+each update from it.
+
+```
+https://raw.githubusercontent.com/Stiven-Gjekaj/sidestore-source/main/apps.json
+```
+
+**By hand:** each release has an unsigned `ZettaStream.ipa`. Sign and install
+it with one of these tools:
 
 - [AltStore](https://altstore.io) or [SideStore](https://sidestore.io)
 - [Sideloadly](https://sideloadly.io)
