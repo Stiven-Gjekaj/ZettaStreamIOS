@@ -66,12 +66,17 @@ public actor AddonRepository {
     ///   - fallbackSubtitlesUrl: The addon that gives subtitles when no installed addon does.
     ///   - clock: The time for the caches. A test sets its own time.
     ///   - subtitleWait: The time that each subtitle addon gets.
+    ///   - kitsu: Finds the Kitsu form of a MyAnimeList ID. See `AnimeIds`.
+    private let kitsu: KitsuMapper
+
     public init(
         client: AddonClient,
         fallbackSubtitlesUrl: String? = AddonRepository.openSubtitles,
         clock: @escaping @Sendable () -> Date = { Date() },
-        subtitleWait: Duration = .seconds(4)
+        subtitleWait: Duration = .seconds(4),
+        kitsu: KitsuMapper = KitsuMapper()
     ) {
+        self.kitsu = kitsu
         self.client = client
         self.fallbackSubtitlesUrl = fallbackSubtitlesUrl
         self.clock = clock
@@ -274,17 +279,21 @@ public actor AddonRepository {
 
     /// Asks each addon for streams. Each group comes when its addon answers, and the
     /// stream ends after the last addon. Torrent streams come too when `withTorrents` is true.
+    ///
+    /// A MyAnimeList ID also goes, in its Kitsu form, to the addons that read Kitsu IDs.
     public func streams(type: String, videoId: String, withTorrents: Bool = false) -> AsyncStream<StreamGroup> {
-        let addons = state.addons.filter { $0.supports("stream", type: type, id: videoId) }
+        let installed = state.addons
         let client = client
+        let kitsu = kitsu
         return AsyncStream { continuation in
             let task = Task {
+                let requests = await Self.requests(installed, type: type, videoId: videoId, kitsu: kitsu)
                 await withTaskGroup(of: Void.self) { group in
-                    for addon in addons {
+                    for (addon, id) in requests {
                         group.addTask {
                             let found: StreamGroup
                             do {
-                                let all = try await client.streams(addon, type: type, videoId: videoId)
+                                let all = try await client.streams(addon, type: type, videoId: id)
                                 let playable = all.filter { $0.isPlayable(withTorrents: withTorrents) }
                                 let hidden = withTorrents ? 0 : all.filter(\.isTorrent).count
                                 found = StreamGroup(addon: addon, streams: playable, hiddenTorrents: hidden,
@@ -302,10 +311,23 @@ public actor AddonRepository {
         }
     }
 
+    /// The addons to ask for the streams of a video, each with the ID that it reads.
+    /// An addon that reads the ID itself gets it. When the ID is a MyAnimeList ID,
+    /// the addons that read only its Kitsu form get that form.
+    static func requests(_ addons: [Addon], type: String, videoId: String, kitsu: KitsuMapper) async -> [(Addon, String)] {
+        var requests = addons.filter { $0.supports("stream", type: type, id: videoId) }.map { ($0, videoId) }
+        guard let mal = AnimeIds.mal(videoId), let kitsuId = await kitsu.kitsuId(mal: mal.id) else { return requests }
+        let alias = AnimeIds.kitsuVideoId(kitsu: kitsuId, episode: mal.episode)
+        let asked = Set(requests.map(\.0.manifestUrl))
+        requests += addons.filter { !asked.contains($0.manifestUrl) && $0.supports("stream", type: type, id: alias) }.map { ($0, alias) }
+        return requests
+    }
+
     /// Asks one addon for the playable streams of a video. Nil when the addon is not installed.
     public func streamsFrom(addonUrl: String, type: String, videoId: String, withTorrents: Bool = false) async -> [AddonStream]? {
         guard let addon = state.addons.first(where: { $0.manifestUrl == addonUrl }) else { return nil }
-        let all = (try? await client.streams(addon, type: type, videoId: videoId)) ?? []
+        let id = await Self.requests([addon], type: type, videoId: videoId, kitsu: kitsu).first?.1 ?? videoId
+        let all = (try? await client.streams(addon, type: type, videoId: id)) ?? []
         return all.filter { $0.isPlayable(withTorrents: withTorrents) }
     }
 
