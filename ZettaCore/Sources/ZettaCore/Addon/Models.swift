@@ -39,6 +39,48 @@ public struct MetaPreview: Hashable, Sendable, Codable {
     }
 }
 
+/// The JSON form of the Android app, so that a library and a backup move between the two apps.
+/// A missing key takes its default. Each key is written, also a null, as the Android backup does.
+extension MetaPreview {
+    enum CodingKeys: String, CodingKey {
+        case id, type, name, poster, posterShape, background, logo, description, releaseInfo, imdbRating, genres, aliases
+        case imdbId = "imdb_id"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(id: try c.decode(String.self, forKey: .id), type: try c.decode(String.self, forKey: .type),
+                  name: try c.decodeIfPresent(String.self, forKey: .name) ?? "")
+        poster = try c.decodeIfPresent(String.self, forKey: .poster)
+        posterShape = try c.decodeIfPresent(String.self, forKey: .posterShape)
+        background = try c.decodeIfPresent(String.self, forKey: .background)
+        logo = try c.decodeIfPresent(String.self, forKey: .logo)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        releaseInfo = try c.decodeIfPresent(String.self, forKey: .releaseInfo)
+        imdbRating = try c.decodeIfPresent(String.self, forKey: .imdbRating)
+        genres = try c.decodeIfPresent([String].self, forKey: .genres) ?? []
+        aliases = try c.decodeIfPresent([String].self, forKey: .aliases) ?? []
+        imdbId = try c.decodeIfPresent(String.self, forKey: .imdbId)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(type, forKey: .type)
+        try c.encode(name, forKey: .name)
+        try c.encode(poster, forKey: .poster)
+        try c.encode(posterShape, forKey: .posterShape)
+        try c.encode(background, forKey: .background)
+        try c.encode(logo, forKey: .logo)
+        try c.encode(description, forKey: .description)
+        try c.encode(releaseInfo, forKey: .releaseInfo)
+        try c.encode(imdbRating, forKey: .imdbRating)
+        try c.encode(genres, forKey: .genres)
+        try c.encode(aliases, forKey: .aliases)
+        try c.encode(imdbId, forKey: .imdbId)
+    }
+}
+
 /// One episode of a series, or one part of a title.
 public struct Video: Hashable, Sendable, Codable {
     public var id: String
