@@ -26,6 +26,14 @@ targets:
       - App/Resources
     dependencies:
       - package: ZettaCore
+      # The torrent engine. scripts/build-torrent.sh builds it. gomobile makes
+      # a static framework, so the app links it and does not embed it.
+      - framework: Frameworks/ZettaTorrent.xcframework
+        embed: false
+      # The Go net package uses the DNS resolver of the system. The uTP
+      # library of anacrolix/torrent is C++.
+      - sdk: libresolv.tbd
+      - sdk: libc++.tbd
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.stivengjekaj.zettastream
