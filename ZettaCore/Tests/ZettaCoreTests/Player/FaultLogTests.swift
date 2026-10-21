@@ -34,6 +34,14 @@ struct FaultLogTests {
         #expect(FaultLog.reason(["HTTP 403 error"] + general) == "HTTP 403 error")
     }
 
+    /// VLC 4 wrote these lines on a Mac while a 10 second MP4 played to its end with no fault.
+    @Test func theLinesOfAGoodStreamAreNoise() {
+        #expect(FaultLog.isNoise("local stream 1 error: Stream closed (0x5)"))
+        #expect(FaultLog.isNoise("local stream 3 error: Cancellation (0x8)"))
+        #expect(!FaultLog.isNoise("HTTP 403 error"))
+        #expect(!FaultLog.isNoise("connection reset by peer"))
+    }
+
     @Test func aNumberThatIsNotAStatusIsNotARefusal() {
         #expect(FaultLog.fault(["picture 404 is late"]) != .refused)
         #expect(FaultLog.fault(["http 200 ok", "socket closed"]) == .network)

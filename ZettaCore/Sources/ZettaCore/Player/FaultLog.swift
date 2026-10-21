@@ -6,6 +6,15 @@ public enum FaultLog {
     /// The most lines that the player keeps. The fault is in the last lines.
     public static let keptLines = 20
 
+    /// True for an error line that VLC writes also while a stream plays well. The HTTP/2 client
+    /// of VLC writes a line each time it closes one request, such as
+    /// "local stream 1 error: Stream closed (0x5)". The player does not keep these lines, so
+    /// that they do not push out the line of the cause.
+    public static func isNoise(_ line: String) -> Bool {
+        let lower = line.lowercased()
+        return lower.hasPrefix("local stream ") && (lower.contains("stream closed") || lower.contains("cancellation"))
+    }
+
     /// The fault of the lines. A decoder fault wins over a refused stream, a refused stream
     /// wins over no connection, and so on, because VLC often writes a general line after the
     /// line that tells the cause.
