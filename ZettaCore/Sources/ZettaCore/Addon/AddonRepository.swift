@@ -51,6 +51,8 @@ public actor AddonRepository {
     private var generation = 0
     private var streamCache: [String: (Date, [StreamGroup])] = [:]
     private var catalogCache: [String: [MetaPreview]] = [:]
+    /// The catalogs that answered since the start. The others in the cache come from the disk.
+    private var freshCatalogs: Set<String> = []
     private var searchCache: [String: (Date, [MetaPreview])] = [:]
 
     /// How long the app keeps the results of a search: 10 minutes.
@@ -67,16 +69,26 @@ public actor AddonRepository {
     ///   - clock: The time for the caches. A test sets its own time.
     ///   - subtitleWait: The time that each subtitle addon gets.
     ///   - kitsu: Finds the Kitsu form of a MyAnimeList ID. See `AnimeIds`.
+    ///   - disk: Keeps the manifests and the catalogs for the next start. See `AddonDisk`.
     private let kitsu: KitsuMapper
+    private let disk: AddonDisk?
+    private var catalogSave: Task<Void, Never>?
+    /// The time between the last answer of a catalog and the write of the catalogs.
+    private let catalogSaveDelay: Duration
 
     public init(
         client: AddonClient,
         fallbackSubtitlesUrl: String? = AddonRepository.openSubtitles,
         clock: @escaping @Sendable () -> Date = { Date() },
         subtitleWait: Duration = .seconds(4),
-        kitsu: KitsuMapper = KitsuMapper()
+        kitsu: KitsuMapper = KitsuMapper(),
+        disk: AddonDisk? = nil,
+        catalogSaveDelay: Duration = .seconds(2)
     ) {
+        self.catalogSaveDelay = catalogSaveDelay
         self.kitsu = kitsu
+        self.disk = disk
+        catalogCache = disk?.catalogs.value ?? [:]
         self.client = client
         self.fallbackSubtitlesUrl = fallbackSubtitlesUrl
         self.clock = clock
@@ -109,35 +121,54 @@ public actor AddonRepository {
         self.sources = sources
         generation += 1
         let mine = generation
+        let urls = sources.filter { $0.kind == .addon }.map(\.url)
+        let saved = disk?.manifests.value ?? [:]
         var loading = state
         loading.loading = true
+        // At the start, the addons of the disk show at once, while the network answers.
+        if loading.addons.isEmpty {
+            loading.addons = urls.compactMap { url in
+                saved[Addon.normalizeManifestUrl(url)].flatMap { try? AddonClient.addon(manifestUrl: url, manifest: $0) }
+            }
+        }
         set(loading)
-        let urls = sources.filter { $0.kind == .addon }.map(\.url)
         let client = client
-        let results = await withTaskGroup(of: (Int, Result<Addon, Error>).self) { group in
+        let results = await withTaskGroup(of: (Int, Result<(addon: Addon, manifest: JSONValue), Error>).self) { group in
             for (i, url) in urls.enumerated() {
                 group.addTask {
                     // The index goes into a constant before the first await. The Swift 6.4
                     // optimizer gave each task the index 0 when it read the loop value after
                     // the await. See docs/decisions.md, "Release builds and task groups".
                     let index = i
-                    let result: Result<Addon, Error>
-                    do { result = .success(try await client.install(url)) } catch { result = .failure(error) }
+                    let result: Result<(addon: Addon, manifest: JSONValue), Error>
+                    do { result = .success(try await client.installKeepingManifest(url)) } catch { result = .failure(error) }
                     return (index, result)
                 }
             }
-            var all = [Result<Addon, Error>?](repeating: nil, count: urls.count)
+            var all = [Result<(addon: Addon, manifest: JSONValue), Error>?](repeating: nil, count: urls.count)
             for await (i, result) in group { all[i] = result }
             return all.compactMap { $0 }
         }
         guard mine == generation else { return }
         var next = AddonState()
+        var keep: [String: JSONValue] = [:]
         for (url, result) in zip(urls, results) {
+            let key = Addon.normalizeManifestUrl(url)
             switch result {
-            case .success(let addon): next.addons.append(addon)
-            case .failure(let error): next.failures[url] = Self.message(error)
+            case .success(let found):
+                next.addons.append(found.addon)
+                keep[key] = found.manifest
+            case .failure(let error):
+                // With no answer, the manifest of the disk keeps the addon working.
+                if let old = saved[key], let addon = try? AddonClient.addon(manifestUrl: url, manifest: old) {
+                    next.addons.append(addon)
+                    keep[key] = old
+                } else {
+                    next.failures[url] = Self.message(error)
+                }
             }
         }
+        disk?.saveManifests(keep)
         set(next)
     }
 
@@ -174,10 +205,33 @@ public actor AddonRepository {
         catalogCache[row.key]
     }
 
+    /// True when the cached answer of the catalog came since the start, and not from the disk.
+    public func isFresh(_ row: CatalogRow) -> Bool {
+        freshCatalogs.contains(row.key)
+    }
+
     public func catalog(_ row: CatalogRow) async throws -> [MetaPreview] {
         let metas = try await client.catalog(row.addon, row.catalog, extras: row.extras)
         catalogCache[row.key] = metas
+        freshCatalogs.insert(row.key)
+        scheduleCatalogSave()
         return metas
+    }
+
+    /// Writes the catalogs a short time after the last answer, so that the rows of Home
+    /// cause one write and not one write for each row.
+    private func scheduleCatalogSave() {
+        guard disk != nil else { return }
+        catalogSave?.cancel()
+        catalogSave = Task {
+            try? await Task.sleep(for: catalogSaveDelay)
+            guard !Task.isCancelled else { return }
+            saveCatalogs()
+        }
+    }
+
+    private func saveCatalogs() {
+        disk?.saveCatalogs(catalogCache, addons: Set(state.addons.map(\.manifestUrl)))
     }
 
     /// Searches each catalog that supports a search. Results come as they arrive, as one list

@@ -17,10 +17,19 @@ public struct AddonClient: Sendable {
     }
 
     public func install(_ manifestUrl: String) async throws -> Addon {
-        let url = Addon.normalizeManifestUrl(manifestUrl)
-        let root = try await get(url)
+        try await installKeepingManifest(manifestUrl).addon
+    }
+
+    /// Installs an addon and also gives its manifest as JSON, so that it can go to the disk.
+    public func installKeepingManifest(_ manifestUrl: String) async throws -> (addon: Addon, manifest: JSONValue) {
+        let root = try await get(Addon.normalizeManifestUrl(manifestUrl))
+        return (try Self.addon(manifestUrl: manifestUrl, manifest: root), root)
+    }
+
+    /// Makes an addon from a manifest that is already here, such as one from the disk.
+    public static func addon(manifestUrl: String, manifest root: JSONValue) throws -> Addon {
         guard root.objectValue != nil else { throw ManifestError(message: "The manifest is not a JSON object") }
-        return Addon(manifestUrl: url, manifest: try Manifest.parse(root))
+        return Addon(manifestUrl: Addon.normalizeManifestUrl(manifestUrl), manifest: try Manifest.parse(root))
     }
 
     public func catalog(_ addon: Addon, _ catalog: Catalog, extras: [(String, String)] = []) async throws -> [MetaPreview] {
