@@ -129,3 +129,12 @@ A choice there applies here too, if this list does not replace it.
 - Reason: the player can play in the background and in Picture in Picture
   while the device is locked. Complete protection stops the app from reading
   its files then.
+
+## 2026-10-21: A start limit for a direct link
+
+- A direct link that shows no picture in 45 seconds counts as a stream that
+  did not start. The next best stream plays.
+- A torrent has no such limit, because the engine first waits for its peers.
+- Reason: VLC has no read time limit. A file host that sends too slowly held
+  the player on a black screen with no fault. ExoPlayer on Android stops such
+  a stream with a time-out error.
