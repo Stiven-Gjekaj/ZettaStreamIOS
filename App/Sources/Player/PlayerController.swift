@@ -223,9 +223,13 @@ final class PlayerController: ObservableObject {
                 return open(url, headers: video.headers, startAt: startAt)
             }
             // The engine first gets the torrent information from peers, then serves the file on this device.
+            let folder = app.container.caches.appendingPathComponent("torrents")
+            guard TorrentSpace.canStart(free: TorrentSpace.free(at: app.container.caches)) else {
+                if !tryNext() { showError("The device has less than 1 GB of free space, so a torrent cannot start. Free some space, or play a direct link.") }
+                return
+            }
             torrentText = "Finding peers for the torrent"
             torrentHash = torrent.infoHash
-            let folder = app.container.caches.appendingPathComponent("torrents")
             let upload = settings.torrentUpload ? 0 : TorrentEngine.defaultUploadLimit
             loadTask = Task { [weak self] in
                 do {
@@ -618,6 +622,13 @@ final class PlayerController: ObservableObject {
             }
         }
         if ticks % (Self.saveInterval * 4) == 0 && playing { saveProgress() }
+        if ticks % 40 == 0, torrentHash != nil, let app, !TorrentSpace.canContinue(free: TorrentSpace.free(at: app.container.caches)) {
+            // The data of the torrent goes, so that the device does not fill up.
+            saveProgress()
+            releasePlayer()
+            stopTorrent()
+            showError("The device is almost full, so the torrent stopped. Free some space, then play it again.")
+        }
     }
 
     private func tickCountdown() {

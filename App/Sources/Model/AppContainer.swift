@@ -24,6 +24,9 @@ final class AppContainer: Sendable {
         files = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         caches = manager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         try? manager.createDirectory(at: files, withIntermediateDirectories: true)
+        // The data of a torrent from a run that the system stopped is not necessary. The engine
+        // does not run yet, so the folder can go. The engine also removes it when it starts.
+        try? manager.removeItem(at: caches.appendingPathComponent("torrents"))
         let userAgent = "ZettaStream/\(AppInfo.version)"
         client = AddonClient(userAgent: userAgent)
         sources = SourceStore(file: files.appendingPathComponent("sources.txt"))
