@@ -90,6 +90,9 @@ final class PlayerController: ObservableObject {
     /// True after the current VLC player stopped or failed.
     private var playerEnded = false
     private var pauseWhenReady = false
+    /// The position that the current player goes to when it starts. VLC gives a time from the
+    /// start position with the `start-time` option, so the player seeks instead.
+    private var pendingSeek = 0
     /// The length that the current player gave.
     private var length = 0
     private var retries = 0
@@ -257,7 +260,7 @@ final class PlayerController: ObservableObject {
         if let host = url.host {
             for cookie in request.cookies { _ = media.storeCookie(cookie, forHost: host, path: "/") }
         }
-        if startAt > 0 { media.addOption(":start-time=\(Double(startAt) / 1000)") }
+        pendingSeek = startAt
         if !settings.audioLanguage.isEmpty { media.addOption(":audio-language=\(settings.audioLanguage)") }
         // VLC chooses an embedded subtitle of the language. "none" stops a fall back to another language.
         media.addOption(settings.subtitlesOn ? ":sub-language=\(settings.subtitleLanguage.isEmpty ? "none" : settings.subtitleLanguage)" : ":sub-language=none")
@@ -407,6 +410,11 @@ final class PlayerController: ObservableObject {
             buffering = true
         case .playing:
             playing = true
+            if pendingSeek > 0, let player {
+                player.time = VLCTime(int: Int32(clamping: pendingSeek))
+                position = pendingSeek
+                pendingSeek = 0
+            }
             checkReady()
         case .paused:
             playing = false
@@ -433,7 +441,10 @@ final class PlayerController: ObservableObject {
     private func updateTime() {
         guard let player, player.state != .stopped else { return }
         duration = max(length, Int(player.media?.length.intValue ?? 0))
-        position = max(Int(player.time.intValue), 0)
+        let time = Int(player.time.intValue)
+        // VLC can give one wrong time at the first frame. A time far past the end is not used.
+        guard pendingSeek == 0, time >= 0, duration <= 0 || time <= duration + 5_000 else { return }
+        position = time
         checkReady()
         positionChanged()
     }
