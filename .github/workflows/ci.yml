@@ -14,5 +14,17 @@ jobs:
         run: brew install xcodegen
       - name: Test the core package
         run: swift test --package-path ZettaCore
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: Torrent/go.mod
+          cache-dependency-path: Torrent/go.sum
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          "$(go env GOPATH)/bin/gomobile" init
+      - name: Test the torrent engine
+        working-directory: Torrent
+        run: go test ./...
       - name: Build the IPA
         run: ./scripts/build-ipa.sh
