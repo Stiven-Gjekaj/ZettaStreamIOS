@@ -54,11 +54,14 @@ struct PlayerScreen: View {
         tapZones
         if controller.buffering && controller.error == nil {
             VStack(spacing: 16) {
+                // The controls have their buttons in the middle, so the spinner and its text go below them.
                 ProgressView().controlSize(.large).tint(Palette.accent)
+                    .opacity(controller.overlayVisible ? 0 : 1)
                 if let text = controller.torrentText {
                     Text(text).font(Karla.font(15)).foregroundStyle(Palette.textSecondary)
                 }
             }
+            .padding(.top, controller.overlayVisible ? 150 : 0)
             .allowsHitTesting(false)
         }
         if controller.overlayVisible || controller.error != nil {
