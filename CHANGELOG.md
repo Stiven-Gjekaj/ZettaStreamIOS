@@ -12,6 +12,11 @@ major number. See "Version numbers" in the decisions.
 A tag such as `v0.1.0` builds the unsigned IPA and attaches it to a release on
 GitHub as `ZettaStream.ipa`.
 
+## 1.0.1 (2026-10-22)
+
+- Fixes the subtitles that flickered with the ambient side bars. The fill of
+  the bars made VLC hide the subtitles two times each second.
+
 ## 1.0.0 (2026-10-21)
 
 - Starts faster. The addons and the rows of Home come from the disk at once,
