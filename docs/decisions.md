@@ -244,3 +244,13 @@ A choice there applies here too, if this list does not replace it.
   Type when the setting changes.
 - A loading bar is hidden from VoiceOver, because it is too small to touch.
 
+## 2026-10-22: The ambient fill
+
+- The ambient fill of the side bars reads a tiny copy of the picture on the
+  screen, two times each second while the video plays.
+- Reason: the fill first used the snapshot of VLC. For the frame of each
+  snapshot, VLC did not show the subtitles, so they flickered two times each
+  second. A recording of the screen showed a line of speech that went away
+  and came back inside one line. With black side bars, the subtitles did not
+  flicker.
+
