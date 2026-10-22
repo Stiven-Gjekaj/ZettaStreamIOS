@@ -11,7 +11,6 @@ enum PlayerEvent: Sendable {
     case length(Int64)
     case trackAdded(id: String, isText: Bool)
     case tracksChanged
-    case snapshot
 }
 
 /// The delegate of VLC. VLC can call it on its own threads, so the receiver sends each event
@@ -35,9 +34,6 @@ final class PlayerEventBridge: NSObject, VLCMediaPlayerDelegate, @unchecked Send
 
     @objc(mediaPlayerLengthChanged:)
     func mediaPlayerLengthChanged(_ length: Int64) { send(.length(length)) }
-
-    @objc(mediaPlayerSnapshot:)
-    func mediaPlayerSnapshot(_ aNotification: Notification) { send(.snapshot) }
 
     @objc(mediaPlayerTrackAdded:withType:)
     func mediaPlayerTrackAdded(_ trackId: String, with trackType: VLCMedia.TrackType) {

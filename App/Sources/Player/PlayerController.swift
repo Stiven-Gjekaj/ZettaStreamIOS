@@ -436,7 +436,6 @@ final class PlayerController: ObservableObject {
             if isText, !id.hasPrefix("spu/auto/"), !pendingSlaves.isEmpty { slaveTracks[pendingSlaves.removeFirst()] = id }
             refreshTracks()
         case .tracksChanged: refreshTracks()
-        case .snapshot: readSnapshot()
         }
     }
 
@@ -1017,27 +1016,16 @@ final class PlayerController: ObservableObject {
         }
     }
 
-    private var snapshotPath: String {
-        (app?.container.caches ?? FileManager.default.temporaryDirectory).appendingPathComponent("ambient.png").path
-    }
-
-    /// A few times a second, VLC writes a tiny copy of the frame. A paused video needs one copy only.
+    /// A few times a second, the fill reads a tiny copy of the picture on the screen. A paused video
+    /// needs one copy only. VLC has its own copy of the frame, but its subtitles disappear from the
+    /// screen for the frame of each copy, so they flicker. See docs/decisions.md, "The ambient fill".
     private func copyAmbient() {
-        guard let player, playerReady else { return }
+        guard player != nil, playerReady else { return }
         if videoRect == nil { updateVideoRect() }
-        guard ambientNeeded else { return }
-        if player.isPlaying || !ambientCopied {
-            // The PNG writer of VLC fails at the tiny size of the fill ("block size too small"),
-            // so the copy is five times larger. The reader scales it down.
-            player.saveVideoSnapshot(at: snapshotPath, withWidth: Int32(Ambient.width * 5), andHeight: Int32(Ambient.height * 5))
-        }
-        if player.isPlaying { ambientCopied = false }
-    }
-
-    private func readSnapshot() {
-        guard ambientNeeded, let image = UIImage(contentsOfFile: snapshotPath)?.cgImage,
-              let pixels = Self.pixels(image) else { return }
-        ambientCopied = true
+        guard ambientNeeded, let rect = videoRect, rect.width > 0 else { return }
+        let playing = player?.isPlaying ?? false
+        guard playing || !ambientCopied, let pixels = Self.pixels(of: surface, in: rect) else { return }
+        ambientCopied = !playing
         let soft = Ambient.blur(pixels, width: Ambient.width, height: Ambient.height, radius: 2)
         // A new picture only for a clear change, such as a new scene.
         guard Ambient.change(soft, ambientShown) >= Ambient.minChange, let made = Self.image(soft) else { return }
@@ -1045,20 +1033,27 @@ final class PlayerController: ObservableObject {
         ambient = made
     }
 
-    private static let pixelInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
-
-    /// The frame as ARGB numbers at the size of `Ambient`.
-    private static func pixels(_ image: CGImage) -> [UInt32]? {
+    /// The part `rect` of the view, drawn at the size of `Ambient`, as ARGB numbers.
+    private static func pixels(of view: UIView, in rect: CGRect) -> [UInt32]? {
+        let scaleX = CGFloat(Ambient.width) / rect.width, scaleY = CGFloat(Ambient.height) / rect.height
         var pixels = [UInt32](repeating: 0, count: Ambient.width * Ambient.height)
         let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
             guard let context = CGContext(data: buffer.baseAddress, width: Ambient.width, height: Ambient.height, bitsPerComponent: 8,
                                           bytesPerRow: Ambient.width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: pixelInfo)
             else { return false }
-            context.draw(image, in: CGRect(x: 0, y: 0, width: Ambient.width, height: Ambient.height))
-            return true
+            // UIKit draws from the top, and a bitmap context counts from the bottom.
+            context.translateBy(x: 0, y: CGFloat(Ambient.height))
+            context.scaleBy(x: 1, y: -1)
+            UIGraphicsPushContext(context)
+            defer { UIGraphicsPopContext() }
+            let target = CGRect(x: -rect.minX * scaleX, y: -rect.minY * scaleY,
+                                width: view.bounds.width * scaleX, height: view.bounds.height * scaleY)
+            return view.drawHierarchy(in: target, afterScreenUpdates: false)
         }
         return drawn ? pixels : nil
     }
+
+    private static let pixelInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
 
     private static func image(_ pixels: [UInt32]) -> UIImage? {
         var copy = pixels
