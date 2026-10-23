@@ -52,8 +52,14 @@ struct LiveServiceTests {
         #expect(await !repository.subtitles(type: "movie", videoId: "tt0111161").isEmpty)
     }
 
+    /// GitHub gives each address 60 requests in each hour with no token, and the machines of CI
+    /// share their addresses. The workflow gives its token, so this test is not refused there.
     @Test func gitHubGivesTheNewestRelease() async {
-        let release = await UpdateChecker().latest()
+        let configuration = URLSessionConfiguration.ephemeral
+        if let token = ProcessInfo.processInfo.environment["GITHUB_TOKEN"], !token.isEmpty {
+            configuration.httpAdditionalHeaders = ["Authorization": "Bearer \(token)"]
+        }
+        let release = await UpdateChecker(session: URLSession(configuration: configuration)).latest()
         #expect(release?.version.isEmpty == false)
     }
 
