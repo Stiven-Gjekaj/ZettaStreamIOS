@@ -5,7 +5,7 @@ name: End to end
 # recommend any source. With no secret, the tests are skipped.
 #
 # The workflow keeps no screenshots and no result bundle, because they can show
-# the sources.
+# the sources. The log hides each URL.
 on:
   schedule:
     - cron: "41 7 * * 1"
@@ -36,10 +36,13 @@ jobs:
         run: |
           xcodegen --quiet
           device=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone[^(]*\(([0-9A-F-]{36})\)' | grep -oE '[0-9A-F-]{36}')
-          # Only the names and the results of the tests go to the log. A failure
-          # message can hold the text that a test typed, so it stays out.
+          # The names, the results, and the failure messages of the tests go to the log.
+          # A message can hold the text that a test typed, which is the source list, so
+          # each URL becomes <url> and each line stops at 300 characters.
           xcodebuild test -project ZettaStream.xcodeproj -scheme ZettaStream \
             -destination "id=$device" -only-testing:ZettaStreamUITests 2>&1 \
-            | grep -E "Test Case .*(passed|failed)|TEST (SUCCEEDED|FAILED)" \
+            | grep -E "Test Case .*(passed|failed)|error: -\[|TEST (SUCCEEDED|FAILED)" \
+            | sed -E 's#[a-zA-Z][a-zA-Z0-9+.-]*://[^[:space:]"'"'"']+#<url>#g' \
+            | cut -c1-300 \
             | tee build-result.txt
           grep -q "TEST SUCCEEDED" build-result.txt
