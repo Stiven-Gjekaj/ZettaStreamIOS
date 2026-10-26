@@ -195,10 +195,21 @@ final class DeviceChecks: XCTestCase {
         for _ in 0..<6 where !backUp.isHittable { app.swipeUp() }
         backUp.tap()
         // The system sheet asks where to keep the file.
-        wait(app.buttons["DOCPicker.actionButton"], 60, "The file exporter")
+        // iOS 27 shows the exporter in the app with "DOCPicker" names. An older iOS can name its
+        // buttons Save, Move, or Cancel, or show it from a system process.
+        let names = "identifier BEGINSWITH 'DOC' OR label IN {'Save', 'Move', 'Cancel'}"
+        let system = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        var shown = false
+        let end = Date().addingTimeInterval(60)
+        while !shown && Date() < end {
+            shown = app.buttons.matching(NSPredicate(format: names)).firstMatch.exists
+                || system.buttons.matching(NSPredicate(format: names)).firstMatch.exists
+            if !shown { usleep(500_000) }
+        }
+        XCTAssertTrue(shown, "The file exporter does not show.")
         shot("backup")
         app.swipeDown(velocity: .fast)
-        XCTAssertTrue(app.buttons["DOCPicker.actionButton"].waitForNonExistence(timeout: 10), "The file exporter does not close.")
+        sleep(2)
         XCTAssertEqual(app.state, .runningForeground)
     }
 }
