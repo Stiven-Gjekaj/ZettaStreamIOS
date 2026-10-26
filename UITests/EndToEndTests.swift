@@ -54,9 +54,11 @@ final class EndToEndTests: XCTestCase {
 
         // Add the sources on the Sources screen, as a person pastes them.
         app.tabBars.buttons["Settings"].tap()
-        waitFor(app.buttons["Sources"].firstMatch, 10, "The Sources entry")
+        // The row says the number of sources after its name, such as "Sources, 43 sources".
+        let sourcesRow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Sources'")).firstMatch
+        waitFor(sourcesRow, 10, "The Sources entry")
         shot("settings")
-        app.buttons["Sources"].firstMatch.tap()
+        sourcesRow.tap()
         let editor = app.textViews.firstMatch
         waitFor(editor, 10, "The source editor")
         editor.tap()
