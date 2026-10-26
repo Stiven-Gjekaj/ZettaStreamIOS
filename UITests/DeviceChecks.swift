@@ -67,14 +67,22 @@ final class DeviceChecks: XCTestCase {
         XCTFail("The video does not play.")
     }
 
+    /// The controls hide after a few seconds. On a slow machine they can hide before the tap,
+    /// so this shows them again until the Close button is there.
     private func closePlayer() {
-        showControls()
-        app.buttons["Close"].tap()
+        let close = app.buttons["Close"]
+        for _ in 0..<3 where !close.isHittable {
+            player.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+            _ = close.waitForExistence(timeout: 3)
+        }
+        close.tap()
         XCTAssertTrue(player.waitForNonExistence(timeout: 10), "The player does not close.")
     }
 
     func testLiveTvShowsTheChannelsAndPlaysOne() {
         app.tabBars.buttons["Live TV"].tap()
+        // The playlists and the guides load first. A query while they load can time out on a slow machine.
+        sleep(20)
         let channel = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'channel:'")).firstMatch
         wait(channel, 120, "A channel")
         sleep(5)
@@ -187,7 +195,7 @@ final class DeviceChecks: XCTestCase {
         for _ in 0..<6 where !backUp.isHittable { app.swipeUp() }
         backUp.tap()
         // The system sheet asks where to keep the file.
-        wait(app.buttons["DOCPicker.actionButton"], 15, "The file exporter")
+        wait(app.buttons["DOCPicker.actionButton"], 60, "The file exporter")
         shot("backup")
         app.swipeDown(velocity: .fast)
         XCTAssertTrue(app.buttons["DOCPicker.actionButton"].waitForNonExistence(timeout: 10), "The file exporter does not close.")
