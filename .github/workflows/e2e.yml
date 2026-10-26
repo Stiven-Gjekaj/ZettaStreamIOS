@@ -36,6 +36,8 @@ jobs:
         run: |
           xcodegen --quiet
           device=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone[^(]*\(([0-9A-F-]{36})\)' | grep -oE '[0-9A-F-]{36}')
+          echo "Simulator: $(xcrun simctl list devices available | grep "$device")"
+          xcodebuild -version
           # The names, the results, and the failure messages of the tests go to the log.
           # A message can hold the text that a test typed, which is the source list, so
           # each URL becomes <url> and each line stops at 300 characters.
